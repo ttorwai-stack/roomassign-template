@@ -1,0 +1,1319 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>율곡연수원 숙소 배정</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="config.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{
+  --bg:#f4f6f9;--card:#fff;--ink:#1d2733;--sub:#6b7785;--line:#dde3ea;--pri:#2457c5;--pri-bg:#e8effc;
+  --m:#2b6cb0;--m-bg:#e6f0fb;--f:#b83280;--f-bg:#fbe8f3;--ok:#1f8a4c;--ok-bg:#e4f5ea;--warn:#b7791f;--warn-bg:#fdf3dc;--bad:#c0392b;--bad-bg:#fbe9e7;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#12171e;--card:#1b232d;--ink:#e6ebf1;--sub:#97a3b0;--line:#2c3744;--pri:#7aa2ff;--pri-bg:#1f2c47;
+  --m:#7fb2f0;--m-bg:#1c2c3f;--f:#f08fc3;--f-bg:#3b2232;--ok:#5fd18d;--ok-bg:#1b3326;--warn:#e7b85c;--warn-bg:#382e17;--bad:#ff8a7a;--bad-bg:#3d2320}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Malgun Gothic",sans-serif;-webkit-text-size-adjust:100%}
+#bar{position:fixed;top:0;left:0;height:3px;background:var(--pri);width:0;transition:width .3s;z-index:99}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:20}
+header h1{font-size:17px;margin:0;flex:1 1 auto}
+header h1 small{display:block;font-size:12px;color:var(--sub);font-weight:400}
+.tabs{display:flex;gap:4px;flex-wrap:wrap}
+.tab{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:6px 12px;border-radius:999px;font-size:14px;cursor:pointer}
+.tab.on{background:var(--pri);border-color:var(--pri);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:14px 16px 80px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.card h2{font-size:15px;margin:0 0 8px}
+.hint{color:var(--sub);font-size:13px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+input,select,textarea,button{font:inherit;color:inherit}
+input[type=text],input[type=tel],input[type=password],input[type=number],select,textarea{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 10px;min-width:0}
+textarea{width:100%;min-height:90px}
+button{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:8px 12px;cursor:pointer}
+button.pri{background:var(--pri);border-color:var(--pri);color:#fff}
+button.bad{color:var(--bad)}
+button:disabled{opacity:.5;cursor:default}
+button.sm{padding:3px 8px;font-size:13px}
+.tag{display:inline-flex;align-items:center;gap:4px;padding:6px 11px;margin:3px;border-radius:999px;border:1px solid var(--line);background:var(--bg);cursor:grab;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;font-size:15px;touch-action:manipulation}
+.tag small{color:var(--sub);font-size:11px}
+.tag.M{background:var(--m-bg);border-color:var(--m)}
+.tag.F{background:var(--f-bg);border-color:var(--f)}
+.tag.done{opacity:.45}
+.tag.sel{outline:3px solid var(--pri)}
+.tag.pin::after{content:"📌";font-size:11px}
+.tag.mine{background:var(--pri);color:#fff;border-color:var(--pri)}
+.ghost{position:fixed;z-index:200;pointer-events:none;opacity:.9;transform:translate(-50%,-60%);box-shadow:0 6px 18px rgba(0,0,0,.25)}
+.zones{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
+.zone{border:2px dashed var(--line);border-radius:12px;padding:12px;background:var(--card);min-height:110px}
+.zone.over{border-color:var(--pri);background:var(--pri-bg)}
+.zone.on{border:2px solid var(--pri);background:var(--pri-bg);grid-column:1/-1}
+.cand>div{min-width:0}.cand .tag{flex:0 0 auto}
+.zone h3{margin:0 0 4px;font-size:15px}
+.zone p{margin:0;color:var(--sub);font-size:13px}
+.cand{display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-top:1px solid var(--line)}
+.cand .why{font-size:12px;color:var(--sub)}
+.cand.choseMe .why{color:var(--ok);font-weight:600}
+.cand.dis{opacity:.5}
+.banner{border-radius:10px;padding:10px 12px;margin:8px 0;font-size:14px}
+.banner.ok{background:var(--ok-bg);color:var(--ok)}
+.banner.wait{background:var(--warn-bg);color:var(--warn)}
+.banner.bad{background:var(--bad-bg);color:var(--bad)}
+.roomcard{font-size:20px;font-weight:700}
+.chk{display:inline-flex;align-items:center;gap:6px;margin:3px 10px 3px 0}
+table{border-collapse:collapse;width:100%}
+th,td{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left;vertical-align:middle;font-size:14px}
+th{color:var(--sub);font-weight:600;font-size:12px;position:sticky;top:0;background:var(--card)}
+td input[type=text]{width:100%}
+.gbtn{width:44px}
+.gbtn.M{background:var(--m-bg);color:var(--m)}.gbtn.F{background:var(--f-bg);color:var(--f)}.gbtn.N{background:var(--warn-bg);color:var(--warn)}
+.scroll{max-height:60vh;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.floor{margin-bottom:12px}
+.floor h3{margin:0 0 6px;font-size:14px}
+.pool{min-height:54px;border:2px dashed var(--line);border-radius:10px;padding:4px}
+.pool.over{border-color:var(--pri);background:var(--pri-bg)}
+#loading{position:fixed;left:50%;top:76px;transform:translateX(-50%);z-index:250;display:none;align-items:center;gap:10px;background:#1d2733;color:#fff;padding:11px 18px;border-radius:999px;font-size:15px;box-shadow:0 6px 20px rgba(0,0,0,.3);max-width:92vw}
+#loading.on{display:flex}
+.spin{display:inline-block;width:18px;height:18px;border:3px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:sp .8s linear infinite;flex:0 0 auto}
+.spin.dark{border-color:rgba(0,0,0,.15);border-top-color:var(--pri)}
+@keyframes sp{to{transform:rotate(360deg)}}
+body.isbusy button,body.isbusy .zbtn{pointer-events:none}
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#1d2733;color:#fff;padding:10px 16px;border-radius:10px;z-index:300;font-size:14px;max-width:90vw;display:none}
+#toast.err{background:var(--bad)}
+.badge{display:inline-block;font-size:11px;padding:1px 6px;border-radius:6px;background:var(--line);color:var(--sub);margin-left:4px}
+.warnlist{margin:6px 0 0;padding-left:18px;font-size:13px;color:var(--warn)}
+.saved{font-size:12px;color:var(--ok)}
+.steps{display:flex;gap:4px;margin:0 0 10px;font-size:12px;color:var(--sub);flex-wrap:wrap}
+.steps span{padding:3px 8px;border-radius:999px;background:var(--card);border:1px solid var(--line)}
+.steps .on{background:var(--pri);border-color:var(--pri);color:#fff;font-weight:700}.steps .done{color:var(--ok)}
+.big-card{padding:18px}.big-card h2{font-size:19px;margin:0 0 8px}
+.bigin{width:100%;font-size:20px;padding:12px;margin:8px 0}
+.bigbtn{width:100%;font-size:17px;padding:14px;border-radius:12px;margin-top:6px}
+.row2{display:flex;gap:8px}.row2 .bigbtn{flex:1}
+.gm{background:var(--m-bg);color:var(--m);border-color:var(--m)}.gf{background:var(--f-bg);color:var(--f);border-color:var(--f)}
+.tagbox{text-align:center;margin:10px 0 14px}
+.tag.big{font-size:22px;padding:10px 22px;cursor:grab;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.zlist{display:grid;gap:8px}
+.zbtn{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:14px;border-radius:12px;font-size:16px;min-height:70px}
+.zbtn span{font-size:13px;color:var(--sub);font-weight:400}
+.zbtn.over{border-color:var(--pri);background:var(--pri-bg)}
+.badge.st{background:var(--warn-bg);color:var(--warn);font-weight:600}
+.fchips{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+.chip{border-radius:999px;padding:5px 12px;font-size:14px}.chip.on{background:var(--pri);border-color:var(--pri);color:#fff}
+.link{background:none;border:0;color:var(--sub);text-decoration:underline;margin-top:10px}
+.bigchk{display:flex;padding:10px 0;font-size:16px;border-bottom:1px solid var(--line)}
+.okmark{width:48px;height:48px;border-radius:50%;background:var(--ok-bg);color:var(--ok);display:flex;align-items:center;justify-content:center;font-size:26px;margin-bottom:6px}
+/* 배치도 */
+.plan{--wall:#6b7580;--gray:#dfe3e8;--yellow:#fff1a8;--cw:86px;--ch:128px;overflow-x:auto;padding:2px 2px 4px}
+@media (prefers-color-scheme:dark){.plan{--wall:#9aa5b1;--gray:#2c3540;--yellow:#4d4519}}
+.plan.sm{--cw:24px;--ch:52px}
+.pgrid{display:grid;grid-template-columns:repeat(11,var(--cw));grid-template-rows:var(--ch) 30px var(--ch);gap:4px;width:max-content}
+.pfix{min-width:0;overflow:hidden;font-size:12px;color:var(--sub);display:flex;align-items:flex-start;justify-content:flex-start;padding:4px 5px}
+.pfix .plabel{font-weight:600}
+.pfix.box{border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)}
+.pfix.box.M{background:var(--m-bg)}.pfix.box.F{background:var(--f-bg)}
+.pfix.box.off{background:var(--gray);color:var(--sub)}
+.pfix.box.yellow{background:var(--yellow);color:var(--ink)}
+.pfix.open .plabel{font-weight:400}
+.pfix.open.entr{align-items:flex-end;justify-content:center;font-size:13px}
+.pfix.plain{align-items:center;padding:0 6px}.pfix.plain .lift{font-style:italic;font-size:12px}
+.pfix.stairs{padding:2px 6px}
+.stairsvg{width:100%;height:100%;display:block}
+.stairsvg line{stroke:var(--wall);stroke-width:1.2;vector-effect:non-scaling-stroke}
+.room{border:1px solid var(--line);border-radius:10px;padding:5px 6px;background:var(--card);overflow:hidden;min-width:0}
+.room.over{outline:2px solid var(--pri)}
+.room.off{background:var(--gray)}
+.room.gM{background-color:var(--m-bg)}.room.gF{background-color:var(--f-bg)}
+.room.warn{border-color:var(--bad);box-shadow:0 0 0 1px var(--bad)}
+.room.ondol .roomno::after{content:" 온돌";font-size:10px;color:var(--sub);font-weight:400}
+.room.mine{outline:3px solid var(--pri);background-color:var(--pri-bg)}
+.room.dim{opacity:.55}
+.roomno{font-weight:700;font-size:13px}
+.room .cnt{float:right;font-size:11px;color:var(--sub)}
+.room .tag{display:flex;width:100%;border-radius:999px;margin:3px 0 0;padding:2px 8px;font-size:12px;cursor:grab}
+.room .tag small{display:none}.tag.staff{border-style:dashed}.staffbar{position:sticky;top:58px;z-index:14;padding:8px 12px;box-shadow:0 2px 8px rgba(0,0,0,.12)}.pool.trash{border-color:var(--bad);color:var(--bad);font-size:13px}.pool.trash.over{background:var(--bad-bg)}.room .tag.staff small{display:inline;margin-left:4px;font-size:10px}
+.pool .tag{margin:2px;padding:3px 8px;font-size:13px}
+.plan.sm .ho,.plan.sm .metxt{display:none}.plan .me{font-size:13px;color:var(--pri);font-weight:700;margin-top:2px}.plan.sm .me{font-size:14px;text-align:center}.plan.sm .pfix{font-size:7px;padding:1px;line-height:1.1}.plan.sm .plabel{font-weight:400;word-break:keep-all}.plan.sm .room{padding:1px;text-align:center}.plan.sm .roomno{font-size:9px;white-space:nowrap}.plan.sm .room.ondol .roomno::after{content:""}.plan.sm .pfix.plain .lift{font-size:7px}.plan.sm .pfix.stairs{padding:1px 2px}.plan.sm .pgrid{gap:2px}.plan.sm .room,.plan.sm .pfix.box{border-radius:5px}
+.savebar{position:sticky;top:58px;z-index:15;display:flex;gap:10px;align-items:center;padding:8px 12px}
+.savebar.dirty{border-color:var(--warn);background:var(--warn-bg)}
+.stamp{text-align:center;color:var(--sub);font-size:12px;letter-spacing:.02em;padding:18px 12px 28px;opacity:.8}
+@media print{header,.noprint,.tabs{display:none!important}.card{border:0}body{background:#fff;color:#000}}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+<header>
+  <h1 id="title"><small>율곡연수원</small><span id="ttl">숙소 배정</span></h1>
+  <div class="tabs">
+    <button class="tab on" id="tabU">연수생</button>
+    <button class="tab" id="tabA">관리자</button>
+  </div>
+</header>
+<main id="app"></main>
+<footer class="stamp">Prompted by kidsreturn_79 · © 2026.10</footer>
+<div id="toast"></div>
+<div id="loading"><span class="spin"></span><span id="loadtxt">불러오는 중…</span></div>
+
+<script>
+// ───────── 공통 ─────────
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let busyN = 0;
+let loadT = null, slowT = null;
+function busy(d){
+  busyN += d;
+  $('#bar').style.width = busyN > 0 ? '70%' : '100%';
+  if (busyN <= 0) setTimeout(() => { if (busyN <= 0) $('#bar').style.width = '0'; }, 250);
+  const L = $('#loading');
+  if (busyN > 0){
+    document.body.classList.add('isbusy');
+    if (!loadT) loadT = setTimeout(() => {
+      L.classList.add('on'); $('#loadtxt').textContent = '불러오는 중이에요…';
+      slowT = setTimeout(() => { $('#loadtxt').textContent = '서버가 조금 느려요. 잠시만 기다려 주세요…'; }, 5000);
+    }, 200);
+  } else {
+    clearTimeout(loadT); clearTimeout(slowT); loadT = slowT = null;
+    L.classList.remove('on'); document.body.classList.remove('isbusy');
+  }
+}
+// ── 어느 Apps Script(서버)를 쓸지 ──
+// 기본은 처음 만든 서버(DEFAULT_ID). 다른 사람이 자기 구글 계정으로 서버를 배포했다면 주소 뒤에 ?a=<배포ID> 를 붙여 연다.
+// 화면을 Apps Script 웹앱으로 직접 열면 서버가 doGet에서 BOOT(주소의 c, 웹앱 배포ID)를 채워 준다. 그 밖에는 null.
+const BOOT = /*BOOT*/null/*END*/;
+// config.js(복사해서 쓰는 사람이 자기 서버 배포ID·화면 주소를 적는 파일)가 있으면 그 값을 먼저 쓴다. 없으면 빈 객체.
+// 복사용 묶음(dev/build_template.js)은 아래 두 줄의 "처음 만든 사람" 기본값을 비워서, 복사본이 남의 서버로 데이터를 보내는 일이 없게 한다.
+const CFG = window.RA_CONFIG || {};
+const DEFAULT_ID = apiId(CFG.apiId) || '';
+const SELF_BASE = /(^|\.)github\.io$/.test(location.hostname) ? location.origin + location.pathname.replace(/[^\/]*$/, '') : ''; // 이 화면이 GitHub Pages에서 열렸다면 바로 그 주소
+const SHARED_BASE = CFG.baseUrl || SELF_BASE || ''; // 연수생에게 나눠 줄 화면 주소
+const ASSET_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1') ? '/' : (SELF_BASE || SHARED_BASE); // 한글·엑셀 틀 파일이 있는 곳
+const QP = new URLSearchParams(location.search);
+function apiId(v){ // 배포ID 또는 …/macros/s/<ID>/exec 주소 → ID (아니면 '')
+  v = String(v || '').trim(); const m = v.match(/\/macros\/s\/([A-Za-z0-9_-]{20,})\/exec/) || v.match(/^([A-Za-z0-9_-]{20,})$/);
+  return m ? m[1] : '';
+}
+const MY_ID = (BOOT ? BOOT.id : '') || apiId(QP.get('a')) || (BOOT ? '' : DEFAULT_ID); // 이 화면이 쓰는 서버의 배포ID
+const RA_ID = apiId(QP.get('a')) || DEFAULT_ID;
+const RA_API = RA_ID ? 'https://script.google.com/macros/s/' + RA_ID + '/exec' : '';
+function call(fn, ...a){
+  if (!RA_API && !(window.google && google.script && google.script.run)) return Promise.reject(new Error('서버(배포 ID)가 아직 설정되지 않았어요. config.js 파일에 배포 ID를 넣어 주세요.'));
+  busy(1);
+  if (window.google && google.script && google.script.run){ // Apps Script 안에서 열린 경우
+    return new Promise((ok, no) => google.script.run
+      .withSuccessHandler(r => { busy(-1); ok(r); })
+      .withFailureHandler(e => { busy(-1); no(new Error((e && e.message) || e)); })[fn](...a));
+  }
+  // 다른 주소(GitHub Pages 등)에서 열린 경우: Apps Script 웹앱을 fetch로 호출
+  return fetch(RA_API, { method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' }, body: JSON.stringify({ fn, args: a }) })
+    .then(r => r.json())
+    .then(j => { busy(-1); if (j.error) throw new Error(j.error); return j.result; })
+    .catch(e => { busy(-1); throw new Error(e.message === 'Failed to fetch' ? '서버에 연결할 수 없어요. 잠시 후 다시 시도해 주세요.' : e.message); });
+}
+let toastT;
+function toast(msg, err){ const t = $('#toast'); t.textContent = msg; t.className = err ? 'err' : ''; t.style.display = 'block'; clearTimeout(toastT); toastT = setTimeout(() => t.style.display = 'none', err ? 4500 : 2200); }
+const ls = { get(k){ try { return localStorage.getItem(k); } catch(e){ return null; } }, set(k,v){ try { localStorage.setItem(k,v); } catch(e){} }, del(k){ try { localStorage.removeItem(k); } catch(e){} } };
+const EV = ((BOOT && BOOT.c) || QP.get('c') || '').trim();
+// 연수생 주소: 공유 화면 + (기본 서버가 아니면 ?a=<내 배포ID>) + ?c=<연수코드>
+function pubLink(ev){
+  if (!MY_ID) return '정식 배포(웹앱 /exec) 주소에서 열면 만들어져요';
+  return SHARED_BASE + '?' + (MY_ID === DEFAULT_ID ? '' : 'a=' + MY_ID + '&') + 'c=' + ev;
+}
+function setCourse(name){
+  const t = (name ? name + ' ' : '') + '숙소 배정';
+  $('#ttl').textContent = t; document.title = '율곡연수원 ' + t;
+}
+// <PlanDoc>
+// 숙소배치도 한글(hwpx) 만들기 — 원본 배치도 hwpx를 틀로 쓰고, 방 칸에 이름만 넣고 성별 색을 칠한다.
+// 브라우저(Index.html에 같은 코드가 들어 있음)와 Node(시험)에서 같이 쓴다. JSZip 필요.
+//
+// 틀 규칙(숙소배치도.hwpx): 층마다 표 하나. 호실 칸("415호")과 그 아래 2개의 빈 칸(이름 칸)이 한 방.
+// 색: 화장실(남)/화장실(여) 칸의 배경색을 그대로 호실 칸(호수 칸+이름 칸)에 칠한다.
+var PlanDoc = (function () {
+  'use strict';
+
+  function escXml(s) { return String(s === undefined || s === null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+  // 같은 태그가 중첩될 수 있는 요소의 최상위 범위
+  function topLevel(xml, tag) {
+    var re = new RegExp('<' + tag + '[\\s>]|</' + tag + '>', 'g'), out = [], depth = 0, start = -1, m;
+    while ((m = re.exec(xml))) {
+      if (m[0].charAt(1) !== '/') { if (depth === 0) start = m.index; depth++; }
+      else { depth--; if (depth === 0) out.push([start, m.index + m[0].length]); }
+    }
+    return out;
+  }
+  function textOf(x) { return (x.match(/<hp:t>[^<]*<\/hp:t>/g) || []).map(function (t) { return t.replace(/<\/?hp:t>/g, ''); }).join(''); }
+  function num(x, re) { var m = x.match(re); return m ? +m[1] : 0; }
+
+  // 호실 칸의 배경색을 칠한 새 테두리 모양(borderFill)을 header.xml에 추가 → 새 id. 대각선은 지운다.
+  function addFill(ctx, baseId, color) {
+    var key = baseId + '|' + color; ctx.fills = ctx.fills || {};
+    if (ctx.fills[key]) return ctx.fills[key];
+    var m = ctx.header.match(new RegExp('<hh:borderFill id="' + baseId + '"[\\s\\S]*?</hh:borderFill>'));
+    if (!m) return baseId;
+    var ids = (ctx.header.match(/<hh:borderFill id="(\d+)"/g) || []).map(function (s) { return +s.match(/\d+/)[0]; });
+    var nid = Math.max.apply(null, ids) + 1;
+    var nb = m[0].replace(/id="\d+"/, 'id="' + nid + '"')
+      .replace(/<hh:slash type="\w+"/, '<hh:slash type="NONE"').replace(/<hh:backSlash type="\w+"/, '<hh:backSlash type="NONE"')
+      .replace(/<hc:fillBrush>[\s\S]*?<\/hc:fillBrush>/, '')
+      .replace('</hh:borderFill>', '<hc:fillBrush><hc:winBrush faceColor="' + color + '" hatchColor="#999999" alpha="0"/></hc:fillBrush></hh:borderFill>');
+    ctx.header = ctx.header.replace('</hh:borderFills>', nb + '</hh:borderFills>')
+      .replace(/(<hh:borderFills itemCnt=")(\d+)(")/, function (x, a, v, b) { return a + (+v + 1) + b; });
+    ctx.fills[key] = nid;
+    return nid;
+  }
+  function faceColorOf(header, id, fallback) {
+    var m = header.match(new RegExp('<hh:borderFill id="' + id + '"[\\s\\S]*?</hh:borderFill>'));
+    var c = m && m[0].match(/faceColor="(#[0-9A-Fa-f]{6})"/);
+    return c ? c[1] : fallback;
+  }
+  function setBorderFill(cell, id) { return cell.replace(/^(<hp:tc\b[^>]*borderFillIDRef=")\d+(")/, '$1' + id + '$2'); }
+
+  // 칸의 첫 문단을 틀로 줄 수만큼 문단을 새로 만든다(줄 모양 정보는 한글이 다시 계산)
+  function setCellLines(cell, lines) {
+    var sl = cell.match(/<hp:subList\b[^>]*>/), slEnd = cell.indexOf('</hp:subList>');
+    var inner = cell.slice(sl.index + sl[0].length, slEnd);
+    var proto = inner.slice.apply(inner, topLevel(inner, 'hp:p')[0]);
+    var open = proto.match(/^<hp:p\b[^>]*>/)[0];
+    var cp = (proto.match(/charPrIDRef="(\d+)"/) || [0, '0'])[1];
+    var paras = (lines.length ? lines : ['']).map(function (l) { return open + '<hp:run charPrIDRef="' + cp + '"><hp:t>' + escXml(l) + '</hp:t></hp:run></hp:p>'; }).join('');
+    return cell.slice(0, sl.index + sl[0].length) + paras + cell.slice(slEnd);
+  }
+
+  function cellsOf(tbl) {
+    return topLevel(tbl, 'hp:tc').map(function (r) {
+      var x = tbl.slice(r[0], r[1]);
+      return { s: r[0], e: r[1], xml: x, col: num(x, /colAddr="(\d+)"/), row: num(x, /rowAddr="(\d+)"/), rs: num(x, /rowSpan="(\d+)"/), cs: num(x, /colSpan="(\d+)"/), bf: num(x, /^<hp:tc\b[^>]*borderFillIDRef="(\d+)"/), text: textOf(x) };
+    });
+  }
+
+  /**
+   * data = { title: '연수명', subtitle: '연수생 N명, 운영자(강사) M명', rooms: { '415': { names: [...], g: 'M'|'F' } } }
+   * 반환: { section, header, report: { filled: [호실…], missing: [호실…] } }
+   */
+  function fill(section, header, data) {
+    var ctx = { header: header };
+    var tbls = topLevel(section, 'hp:tbl');
+    // 남/여 색: 화장실(남)·화장실(여) 칸의 배경색
+    var color = { M: '#DFE6F7', F: '#EBDEF1' };
+    tbls.forEach(function (r) {
+      cellsOf(section.slice(r[0], r[1])).forEach(function (c) {
+        var m = c.text.match(/화장실\s*\((남|여)\)/);
+        if (m) color[m[1] === '남' ? 'M' : 'F'] = faceColorOf(header, c.bf, color[m[1] === '남' ? 'M' : 'F']);
+      });
+    });
+    var filled = [], seen = {};
+    var edits = [];   // [start, end, newText] (section 기준)
+    tbls.forEach(function (r) {
+      var tbl = section.slice(r[0], r[1]);
+      var cells = cellsOf(tbl);
+      var repl = [];
+      cells.forEach(function (h) {
+        var m = h.text.match(/^\s*(\d{3})\s*호/);
+        if (!m || h.cs !== 1) return;
+        seen[m[1]] = true;
+        var room = data.rooms[m[1]];
+        if (!room || !room.names || !room.names.length) return;
+        var body = cells.filter(function (x) { return x.col === h.col && x.cs === 1 && x.row >= h.row + h.rs && !x.text.trim(); })
+          .sort(function (a, b) { return a.row - b.row; }).slice(0, 2);
+        var col = color[room.g === 'F' ? 'F' : 'M'];
+        if (body.length === 0) {
+          // 호실 칸 하나로 된 방(예: 1층 101호): 호수 아래 줄에 이름을 쓴다
+          repl.push([h.s, h.e, setCellLines(setBorderFill(h.xml, addFill(ctx, h.bf, col)), [h.text.trim()].concat(room.names))]);
+        } else {
+          repl.push([h.s, h.e, setBorderFill(h.xml, addFill(ctx, h.bf, col))]);
+          // 이름 칸: 첫 칸에 첫 사람, 둘째 칸에 나머지(한 칸에 여러 줄). 칸이 하나뿐이면 모두 그 칸에
+          var groups = body.length >= 2 ? [room.names.slice(0, 1), room.names.slice(1)] : [room.names];
+          groups.forEach(function (lines, i) {
+            var b = body[i];
+            repl.push([b.s, b.e, setCellLines(setBorderFill(b.xml, addFill(ctx, b.bf, col)), lines)]);
+          });
+        }
+        filled.push(m[1]);
+      });
+      // 제목 표(연수명·인원)
+      if (/숙소배치도/.test(textOf(tbl)) && data.title !== undefined) {
+        var t = tbl.replace(/<hp:t>([^<]*)<\/hp:t>/g, function (x, tx) {
+          if (/승진자과정|과정/.test(tx) && !/연수생/.test(tx)) return '<hp:t> ' + escXml(data.title) + '</hp:t>';
+          if (/연수생/.test(tx)) return '<hp:t>' + escXml(data.subtitle || '') + '</hp:t>';
+          return x;
+        });
+        repl.push([0, tbl.length, t]);
+      }
+      // 이 표의 변경을 뒤에서부터 적용
+      repl.sort(function (a, b) { return b[0] - a[0]; });
+      var out = tbl;
+      var applied = [];
+      repl.forEach(function (x) {
+        if (applied.some(function (a) { return x[0] < a[1] && x[1] > a[0]; })) return;   // 겹치는 변경은 건너뜀(제목 표 전체 교체 vs 칸)
+        out = out.slice(0, x[0]) + x[2] + out.slice(x[1]); applied.push(x);
+      });
+      edits.push([r[0], r[1], out]);
+    });
+    edits.sort(function (a, b) { return b[0] - a[0]; });
+    var sec = section;
+    edits.forEach(function (x) { sec = sec.slice(0, x[0]) + x[2] + sec.slice(x[1]); });
+    var missing = Object.keys(data.rooms).filter(function (id) { return data.rooms[id].names && data.rooms[id].names.length && filled.indexOf(id) < 0; });
+    return { section: sec, header: ctx.header, report: { filled: filled, missing: missing } };
+  }
+
+  var STORED = { 'mimetype': 1, 'version.xml': 1, 'Preview/PrvImage.png': 1 };
+
+  // 틀 hwpx(ArrayBuffer/Uint8Array) + 데이터 → 새 hwpx(Uint8Array). 원본의 항목 순서·압축 방식을 그대로 따른다.
+  function build(JSZip, templateBytes, data) {
+    return JSZip.loadAsync(templateBytes).then(function (zip) {
+      var names = Object.keys(zip.files).filter(function (n) { return !zip.files[n].dir; });
+      return Promise.all([zip.file('Contents/section0.xml').async('string'), zip.file('Contents/header.xml').async('string')]).then(function (xs) {
+        var r = fill(xs[0], xs[1], data);
+        var out = new JSZip();
+        var jobs = names.map(function (n) {
+          if (n === 'Contents/section0.xml') return Promise.resolve(r.section);
+          if (n === 'Contents/header.xml') return Promise.resolve(r.header);
+          if (n === 'Preview/PrvText.txt') return Promise.resolve((data.title || '') + '\n' + (data.subtitle || ''));
+          return zip.file(n).async('uint8array');
+        });
+        return Promise.all(jobs).then(function (datas) {
+          names.forEach(function (n, i) { out.file(n, datas[i], { compression: STORED[n] ? 'STORE' : 'DEFLATE', createFolders: false }); });
+          return out.generateAsync({ type: 'uint8array', createFolders: false, mimeType: 'application/hwp+zip' }).then(function (bytes) { return { bytes: bytes, report: r.report }; });
+        });
+      });
+    });
+  }
+
+  return { build: build, fill: fill, topLevel: topLevel, cellsOf: cellsOf, textOf: textOf };
+})();
+// </PlanDoc>
+const TPL_URL = ASSET_BASE + 'template.hwpx';
+const TPL_CK_URL = ASSET_BASE + 'template_cardkey.xlsx';
+// <CardKey>
+// 생활관 카드키 수불부(엑셀) 만들기 — 실제 수불부 서식(template/카드키수불부_틀.xlsx)을 틀로 쓰고 제목·행만 채운다. JSZip 필요.
+// 틀 구조: 1행 제목(A1:G1 병합), 2행 머리글, 3행~ 연수생별 행(연수번호·소속기관·이름·생활관 방번호·키수령·반납·비고). 서식(글꼴·테두리·열 너비·인쇄 설정)은 틀 그대로.
+var CardKey = (function () {
+  'use strict';
+  function esc(s) { return String(s === undefined || s === null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function txt(ref, style, text) {
+    return text === '' || text === undefined || text === null ? '<c r="' + ref + '" s="' + style + '"/>'
+      : '<c r="' + ref + '" s="' + style + '" t="inlineStr"><is><t xml:space="preserve">' + esc(text) + '</t></is></c>';
+  }
+  // rows: [{ num, org, name, room }] — 이미 정렬된 순서대로 들어간다. 방 번호는 문자열(칸이 텍스트 서식).
+  function build(JSZip, templateBytes, data) {
+    var rows = data.rows || [], last = Math.max(3, rows.length + 2);
+    return JSZip.loadAsync(templateBytes, { createFolders: false }).then(function (zip) {
+      return zip.file('xl/worksheets/sheet1.xml').async('string').then(function (sheet) {
+        var head = /<row r="1"[\s\S]*?<\/row><row r="2"[\s\S]*?<\/row>/.exec(sheet);
+        if (!head) throw new Error('수불부 틀 파일의 모양이 달라요');
+        var h = head[0].replace(/<c r="A1" s="(\d+)" t="s"><v>\d+<\/v><\/c>/, function (m, s) { return txt('A1', s, data.title || '생활관 카드키 수불부'); });
+        var body = '';
+        rows.forEach(function (p, i) {
+          var r = i + 3, isLast = i === rows.length - 1, s = isLast ? [11, 12, 12, 13, 14, 12, 15] : [6, 7, 7, 8, 10, 7, 9];
+          body += '<row r="' + r + '" spans="1:7" ht="' + (p.room === '출퇴근' ? '24.75' : '21') + '" customHeight="1"' + (isLast ? ' thickBot="1"' : '') + '>' +
+            '<c r="A' + r + '" s="' + s[0] + '"><v>' + p.num + '</v></c>' + txt('B' + r, s[1], p.org) + txt('C' + r, s[2], p.name) + txt('D' + r, s[3], p.room) +
+            txt('E' + r, s[4], '') + txt('F' + r, s[5], '') + txt('G' + r, s[6], '') + '</row>';
+        });
+        sheet = sheet.replace(/<sheetData>[\s\S]*<\/sheetData>/, function () { return '<sheetData>' + h + body + '</sheetData>'; })
+          .replace(/<dimension ref="[^"]*"\/>/, '<dimension ref="A1:G' + last + '"/>');
+        zip.file('xl/worksheets/sheet1.xml', sheet, { createFolders: false });
+        return zip.file('xl/workbook.xml').async('string').then(function (wb) {
+          zip.file('xl/workbook.xml', wb.replace(/\$G\$70/g, '$G$' + last), { createFolders: false }); // 필터·인쇄 영역을 실제 행 수에 맞춘다
+          return zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
+        });
+      });
+    }).then(function (bytes) { return { bytes: bytes, rowsCount: rows.length }; });
+  }
+  return { build: build };
+})();
+// </CardKey>
+const DEFAULT_OPTIONS = [
+  { id:'commute', title:'출근', desc:'집에서 출퇴근해요', kind:'commute', traits:[], use:true },
+  { id:'stay', title:'숙박', desc:'특별히 원하는 분은 없어요', kind:'stay', traits:[], use:true },
+  { id:'pick', title:'숙박 · 같은 방 쓸 분이 정해져 있어요', desc:'같은 방을 쓸 분을 선택합니다', kind:'pick', traits:[], use:true },
+  { id:'snore', title:'숙박 · 코골이가 심해요', desc:'같은 스타일의 분과 같은 방을 원해요', kind:'style', traits:['snore'], use:true },
+  { id:'sensitive', title:'숙박 · 예민해서 조용히 쓰고 싶어요', desc:'같은 스타일의 분과 같은 방을 원해요', kind:'style', traits:['sensitive','quiet'], use:true },
+  { id:'late', title:'숙박 · 늦게 들어올 수 있어요', desc:'같은 스타일의 분과 같은 방을 원해요', kind:'style', traits:['late'], use:true },
+  { id:'early', title:'숙박 · 일찍 자고 일찍 일어나요', desc:'같은 스타일의 분과 같은 방을 원해요', kind:'style', traits:['early'], use:true }
+];
+// 전화번호 입력 보조: 숫자만 쳐도 010-0000-0000 모양으로 하이픈이 자동으로 들어간다
+function fmtPhone(v){
+  let d = String(v || '').replace(/[^0-9]/g, '').slice(0, 11);
+  if (/^1[0-9]{9}$/.test(d)) d = '0' + d; // 엑셀에서 앞 0이 빠진 값
+  if (d.length < 4) return d;
+  if (d.length < 8) return d.slice(0, 3) + '-' + d.slice(3);
+  return d.slice(0, 3) + '-' + d.slice(3, 7) + '-' + d.slice(7);
+}
+document.addEventListener('input', e => { const t = e.target; if (t.id === 'phone' || t.dataset.f === 'phone') t.value = fmtPhone(t.value); });
+const GN = { M:'남', F:'여', '':'미입력' };
+
+// 숙소 배치도(숙소배치도.pdf 기준). 11칸 격자: 위쪽 줄(1) · 복도(2) · 아래쪽 줄(3)
+//  2~4층: 위쪽 [화장실][샤워실][나눔방/외부출입구][x15 … x09][준비실] / 아래쪽 [계단][x01 … x08][계단]
+//  1층  : 위쪽 [화장실][샤워실][로비…][110 … 106][준비실] / 아래쪽 [계단][현관][사감실][101 … 105][계단]
+//  실·화장실·샤워실·준비실·사감실은 벽(테두리)이 있는 칸, 복도·로비·현관·나눔방·외부출입구는 벽 없는 빈 공간, 계단은 도면 기호.
+function stairSvg(wide){
+  // wide(왼쪽 계단): 위아래로 오르내림 — 가로 단 선, 가운데 세로 구분선, 아래쪽이 계단참
+  // 세로로 긴 오른쪽 계단: 좌우로 오르내림 — 세로 단 선, 가운데 가로 구분선, 오른쪽이 계단참
+  let s = '';
+  if (wide){
+    for (let i = 0; i < 7; i++){ const y = (6 + i * 10.5).toFixed(1); s += `<line x1="3" y1="${y}" x2="48" y2="${y}"/><line x1="52" y1="${y}" x2="97" y2="${y}"/>`; }
+    s += '<line x1="50" y1="6" x2="50" y2="69"/>';
+  } else {
+    for (let i = 0; i < 7; i++){ const x = (6 + i * 9.5).toFixed(1); s += `<line x1="${x}" y1="3" x2="${x}" y2="47"/><line x1="${x}" y1="53" x2="${x}" y2="97"/>`; }
+    s += '<line x1="6" y1="50" x2="63" y2="50"/>';
+  }
+  return `<svg class="stairsvg" viewBox="0 0 100 100" preserveAspectRatio="none"><title>계단</title>${s}</svg>`;
+}
+function planHtml(f, cfg, cellFn, opt){
+  opt = opt || {};
+  const byId = {}; cfg.rooms.forEach(r => byId[r.id] = r);
+  const g = (f === 1 || f === 3) ? 'M' : 'F', gn = g === 'M' ? '남자' : '여자';
+  const out = [], used = new Set();
+  const cell = (col, span, row, rspan, inner, cls) => out.push(`<div class="pfix ${cls || ''}" style="grid-column:${col}/span ${span};grid-row:${row}/span ${rspan}">${inner}</div>`);
+  const lab = t => `<span class="plabel">${t}</span>`;
+  const room = (id, col, row) => {
+    id = String(id); used.add(id);
+    const r = byId[id];
+    out.push(r ? cellFn(r).replace('<div class="room', `<div style="grid-column:${col};grid-row:${row}" class="room`)
+               : `<div class="pfix box off" style="grid-column:${col};grid-row:${row}">${lab(id + '호')}</div>`);
+  };
+  const lift = '<span class="lift">◀ 승강기</span>';
+  if (f === 1){
+    cell(1, 1, 1, 1, lab('남자 화장실'), 'box M'); cell(2, 1, 1, 1, lab('남자 샤워실'), 'box M');
+    cell(3, 3, 1, 2, '', 'open');
+    for (let j = 0; j < 5; j++) room(110 - j, 6 + j, 1);
+    cell(11, 1, 1, 1, lab('준비실'), 'box off');
+    cell(1, 2, 2, 1, lift, 'plain');
+    cell(1, 2, 3, 1, stairSvg(true), 'stairs'); cell(3, 2, 3, 1, lab('▼ 현관'), 'open entr'); cell(5, 1, 3, 1, lab('사감실'), 'box yellow');
+    for (let j = 0; j < 5; j++) room(101 + j, 6 + j, 3);
+    cell(11, 1, 3, 1, stairSvg(false), 'stairs');
+  } else {
+    cell(1, 1, 1, 1, lab(gn + ' 화장실'), 'box ' + g); cell(2, 1, 1, 1, lab(gn + ' 샤워실'), 'box ' + g);
+    cell(3, 1, 1, 2, lab(f === 4 ? '외부 출입구' : '이야기 나눔방'), 'open');
+    for (let n = 15; n >= 9; n--) room(f * 100 + n, 4 + (15 - n), 1);
+    cell(11, 1, 1, 1, lab('준비실'), 'box off');
+    cell(1, 2, 2, 1, lift, 'plain');
+    cell(1, 2, 3, 1, stairSvg(true), 'stairs');
+    for (let n = 1; n <= 8; n++) room(f * 100 + n, 2 + n, 3);
+    cell(11, 1, 3, 1, stairSvg(false), 'stairs');
+  }
+  const extra = cfg.rooms.filter(r => r.floor === f && !used.has(r.id));
+  extra.forEach((r, i) => out.push(cellFn(r).replace('<div class="room', `<div style="grid-column:${3 + i};grid-row:4" class="room`)));
+  return `<div class="plan ${opt.sm ? 'sm' : ''}"><div class="pgrid" style="${extra.length ? 'grid-template-rows:var(--ch) 30px var(--ch) var(--ch)' : ''}">${out.join('')}</div></div>`;
+}
+
+// ───────── 드래그앤드롭 (마우스·터치 공용, 탭 선택도 지원) ─────────
+const DnD = (() => {
+  let st = null, ghost = null, over = null, sel = null;
+  const clearOver = () => { document.querySelectorAll('.over').forEach(e => e.classList.remove('over')); over = null; };
+  function begin(x, y){
+    st.dragging = true;
+    ghost = st.el.cloneNode(true); ghost.classList.add('ghost'); document.body.appendChild(ghost); move(x, y);
+  }
+  let scrollV = 0, scrollT = null;
+  function autoScroll(y){
+    scrollV = y < 90 ? -18 : (y > innerHeight - 90 ? 18 : 0);
+    if (scrollV && !scrollT) scrollT = setInterval(() => { if (!scrollV) { clearInterval(scrollT); scrollT = null; return; } window.scrollBy(0, scrollV); }, 16);
+    if (!scrollV && scrollT){ clearInterval(scrollT); scrollT = null; }
+  }
+  function move(x, y){
+    autoScroll(y);
+    ghost.style.left = x + 'px'; ghost.style.top = y + 'px';
+    ghost.style.display = 'none'; const t = document.elementFromPoint(x, y); ghost.style.display = '';
+    const d = t && t.closest('[data-drop]');
+    if (d !== over){ clearOver(); if (d){ d.classList.add('over'); over = d; } }
+  }
+  document.addEventListener('pointerdown', e => {
+    const el = e.target.closest('[data-drag]');
+    if (!el || e.button > 0 || e.target.closest('button')) return;
+    st = { el, id: el.dataset.drag, x: e.clientX, y: e.clientY, dragging: false, touch: e.pointerType === 'touch' };
+    if (st.touch) st.timer = setTimeout(() => { if (st && !st.dragging) begin(st.x, st.y); }, 260);
+  });
+  document.addEventListener('pointermove', e => {
+    if (!st) return;
+    if (!st.dragging){
+      const d = Math.hypot(e.clientX - st.x, e.clientY - st.y);
+      if (st.touch){ if (d > 10){ clearTimeout(st.timer); st = null; } return; }
+      if (d > 5) begin(e.clientX, e.clientY); else return;
+    }
+    move(e.clientX, e.clientY);
+  });
+  document.addEventListener('touchmove', e => { if (st && st.dragging) e.preventDefault(); }, { passive: false });
+  const finish = (e, cancel) => {
+    if (!st) return;
+    clearTimeout(st.timer);
+    const s = st; st = null;
+    if (s.dragging){
+      scrollV = 0; if (scrollT){ clearInterval(scrollT); scrollT = null; }
+      ghost.style.display = 'none'; const under = document.elementFromPoint(e.clientX, e.clientY); const target = (under && under.closest('[data-drop]')) || over; ghost.remove(); ghost = null; clearOver();
+      if (!cancel && target) { setSel(null); window.onDrop(s.id, target.dataset.drop, s.el); }
+    } else if (!cancel){ setSel(s.el); }
+  };
+  document.addEventListener('pointerup', e => finish(e, false));
+  document.addEventListener('pointercancel', e => finish(e, true));
+  document.addEventListener('contextmenu', e => { if (e.target.closest('[data-drag]')) e.preventDefault(); });
+  function setSel(el){
+    document.querySelectorAll('.sel').forEach(e => e.classList.remove('sel'));
+    if (el && sel && sel.dataset.drag === el.dataset.drag && el.classList.contains('sel')) el = null;
+    sel = el; if (el){ el.classList.add('sel'); toast('놓을 칸을 눌러 주세요 (또는 끌어서 놓기)'); }
+  }
+  document.addEventListener('click', e => {
+    const z = e.target.closest('[data-drop]');
+    if (!z || !sel || e.target.closest('button,input,textarea,select,label')) return;
+    const id = sel.dataset.drag; setSel(null); window.onDrop(id, z.dataset.drop, null);
+  });
+  return { clear(){ setSel(null); } };
+})();
+
+// ───────── 탭 ─────────
+let mode = 'user';
+function setMode(m){
+  mode = m; location.hash = m === 'admin' ? 'admin' : '';
+  $('#tabU').classList.toggle('on', m === 'user'); $('#tabA').classList.toggle('on', m === 'admin');
+  m === 'user' ? User.render() : Admin.render();
+}
+$('#tabU').onclick = () => setMode('user');
+$('#tabA').onclick = () => setMode('admin');
+window.onDrop = (id, target, el) => (mode === 'user' ? User : Admin).drop(id, target, el);
+
+// ═════════ 연수생 화면 (단계별) ═════════
+// 1) 전화번호 → 2) (성별 없으면) 성별 → 3) 내 이름표로 숙박·스타일 선택 → 4) 같은 방 원하는 분 고르기(상대 스타일 표시) → 5) 접수 완료 → 확정 후 내 방
+const User = (() => {
+  const U = { boot: null, phone: ls.get('ra_phone') || '', view: null, edit: false, step: null, cq: '', filter: '' };
+  const phoneOk = () => /^01[0-9]{8,9}$/.test(U.phone.replace(/[^0-9]/g, ''));
+  const myTag = () => `<span class="tag mine big" data-drag="${U.view.me.id}">${esc(U.view.me.name)}</span>`;
+  const tshort = id => { const t = U.boot.traits.find(x => x.id === id); return t ? (t.short || t.label) : id; };
+  const badges = ids => (ids || []).map(t => `<span class="badge st">${esc(tshort(t))}</span>`).join('');
+
+  // 선택지는 관리자가 연수별로 정한다(U.boot.options)
+  const opts = () => (U.boot && U.boot.options) || [];
+  const CIRC = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳';
+
+  async function init(){
+    if (!EV){ U.boot = { noEvent: true }; render(); return; }
+    render();
+    try {
+      const bootP = call('pub_bootstrap', EV);
+      const loginP = phoneOk() ? call('pub_login', EV, U.phone).catch(() => null) : Promise.resolve(null);
+      U.boot = await bootP; setCourse(U.boot.courseName);
+      if (phoneOk()){
+        const v = await loginP;
+        if (v){ U.view = v; U.edit = false; U.step = null; ls.set('ra_phone', U.phone); }
+        else { ls.del('ra_phone'); U.phone = ''; }
+      }
+    } catch(e){ U.boot = { error: e.message }; }
+    render();
+  }
+  async function login(quiet){
+    U.view = await call('pub_login', EV, U.phone);
+    ls.set('ra_phone', U.phone);
+    U.edit = false; U.step = null;
+    if (!quiet) render();
+  }
+  function logout(){ U.view = null; U.phone = ''; ls.del('ra_phone'); U.edit = false; U.step = null; render(); }
+  const status = () => (U.view ? U.view.choice.status : 'none');
+
+  function steps(n){
+    const names = ['번호 확인', '내 정보', '선택', '완료'];
+    return `<div class="steps">${names.map((t,i) => `<span class="${i+1===n?'on':i+1<n?'done':''}">${i+1}. ${t}</span>`).join('')}</div>`;
+  }
+
+  function render(){
+    if (mode !== 'user') return;
+    const app = $('#app');
+    if (!U.boot){ app.innerHTML = '<div class="card" style="text-align:center;padding:24px"><span class="spin dark"></span> <span style="margin-left:8px">불러오는 중이에요…</span></div>'; return; }
+    if (U.boot.noEvent){ app.innerHTML = '<div class="card big-card"><h2>연수 주소로 들어와 주세요</h2><p class="hint">연수 담당자가 보낸 숙소 배정 주소(링크)로 접속해야 해요. 받은 링크를 다시 눌러 주세요.</p></div>'; return; }
+    if (U.boot.error){ app.innerHTML = '<div class="card big-card"><h2>들어갈 수 없어요</h2><p>' + esc(U.boot.error) + '</p></div>'; return; }
+    const v = U.view;
+    if (!v){ app.innerHTML = loginView(); bind(); return; }
+    let h = '';
+    if (v.published){ app.innerHTML = roomCard(v); bind(); fitPlan(); return; }
+    if (v.closed){
+      const dt = esc((v.deadline || '').replace('T', ' '));
+      const b = `<div class="banner bad" style="margin:0 0 10px"><b>신청이 마감되었어요</b> <span style="font-size:13px">(마감 ${dt}) · 이후 배정은 연수 담당자가 진행하고, 확정되면 이 화면에서 방을 볼 수 있어요.</span></div>`;
+      let body;
+      if (!v.me.gender) body = `<div class="card big-card"><h2>${esc(v.me.name)}님</h2><p>성별 입력 없이 마감되었어요. 연수 담당자에게 문의해 주세요.</p></div>`;
+      else if (status() === 'none') body = `<div class="card big-card"><h2>${esc(v.me.name)}님</h2><p>선택 없이 마감되었어요. 방 배정은 연수 담당자가 진행합니다.</p><button class="sm link" id="switch">다른 번호로 들어가기</button></div>`;
+      else body = doneView(true);
+      app.innerHTML = b + body; bind(); return;
+    }
+    const dlBanner = v.deadline ? `<div class="banner wait" style="margin:0 0 10px;font-size:13px">신청 마감: <b>${esc(v.deadline.replace('T', ' '))}</b> · 마감 후에는 선택을 바꿀 수 없어요</div>` : '';
+    if (!v.me.gender) h = steps(2) + genderView();
+    else if (U.edit || status() === 'none') h = steps(3) + chooseView();
+    else if (U.step === 'custom') h = steps(3) + styleView();
+    else if (U.step === 'cand') h = steps(3) + candView();
+    else h = steps(4) + doneView();
+    app.innerHTML = dlBanner + h; bind();
+  }
+
+  // 배치도를 화면 폭에 맞춰 최대한 크게(넓은 화면은 관리자 화면처럼 큼직하게, 좁은 폰은 한 화면에 들어가게)
+  function fitPlan(){
+    const p = document.querySelector('.plan'); if (!p) return;
+    const w = p.clientWidth - 4;
+    let cw = Math.floor((w - 40) / 11);
+    if (cw < 50) cw = Math.floor((w - 20) / 11);
+    cw = Math.max(22, Math.min(cw, 86));
+    p.style.setProperty('--cw', cw + 'px');
+    p.style.setProperty('--ch', Math.round(Math.max(48, Math.min(cw * 1.5, 128))) + 'px');
+    p.classList.toggle('sm', cw < 50);
+  }
+  window.addEventListener('resize', () => { if (mode === 'user') fitPlan(); });
+
+  function loginView(){
+    return `${steps(1)}<div class="card big-card"><h2>휴대전화 번호를 입력해 주세요</h2>
+      <p class="hint">연수 담당자에게 등록된 번호로 본인 확인을 해요.</p>
+      <input type="tel" id="phone" inputmode="numeric" autocomplete="tel" placeholder="010-0000-0000" value="${esc(U.phone)}" class="bigin">
+      <button class="pri bigbtn" id="go">확인</button></div>`;
+  }
+
+  function genderView(){
+    return `<div class="card big-card"><h2>${esc(U.view.me.name)}님, 안녕하세요</h2>
+      <p>방 배정을 위해 <b>성별</b>을 선택해 주세요. (한 번 입력하면 바꿀 수 없어요)</p>
+      <div class="row2"><button class="bigbtn gm" data-act="gender" data-g="M">남</button><button class="bigbtn gf" data-act="gender" data-g="F">여</button></div>
+      <button class="sm link" id="switch">다른 번호로 들어가기</button></div>`;
+  }
+
+  // 3단계: 선택 (대표 유형이 모두 보임)
+  function chooseView(){
+    const cur = curKey();
+    const z = (o, i) => `<button class="zone zbtn ${cur===o.id?'on':''}" data-act="zone" data-z="${o.id}" data-drop="${o.id}"><b>${CIRC[i] || (i+1)+'.'} ${esc(o.title)}</b>${o.desc ? `<span>${esc(o.desc)}</span>` : ''}</button>`;
+    return `<div class="card big-card"><h2>${esc(U.view.me.name)}님, 해당하는 것을 선택해 주세요</h2>
+      <p class="hint">내 이름표를 칸으로 끌어다 놓거나, 칸을 눌러 선택하세요. 스타일은 자동 배정에만 쓰이고 다른 연수생에게는 보이지 않아요.</p>
+      <div class="tagbox">${myTag()}</div>
+      <div class="zlist">${opts().map(z).join('')}</div>
+      ${U.edit ? '<button class="sm link" data-act="cancelEdit">취소</button>' : ''}</div>`;
+  }
+  // 현재 선택을 OPTS 키로 환산
+  function curKey(){
+    const c = U.view.choice, os = opts(); if (c.status === 'none') return '';
+    const pickKind = k => (os.find(o => o.kind === k) || {}).id || '';
+    if (c.status === 'commute') return pickKind('commute');
+    const hit = os.find(o => o.kind === 'style' && o.traits.length === c.traits.length && o.traits.every(t => c.traits.includes(t)));
+    if (hit) return hit.id;
+    return pickKind(c.mates.length ? 'pick' : 'stay');
+  }
+
+  // 후보 목록만 따로 그린다 — 검색칸은 다시 그리지 않아야 한글 입력(조합 중인 글자)이 깨지지 않는다
+  function candListHtml(){
+    const v = U.view, mates = v.choice.mates, cands = v.candidates;
+    const q = U.cq.trim(), order = { choseMe:0, stay:1, undecided:1, otherPending:2, full:3, commute:4 };
+    const list = cands.filter(x => (!q || x.name.includes(q) || x.org.includes(q)))
+      .sort((a,b) => order[a.state]-order[b.state] || a.name.localeCompare(b.name,'ko'));
+    return list.map(x => {
+      const dis = ['full','commute'].includes(x.state), picked = mates.includes(x.id);
+      return `<div class="cand ${x.state} ${dis?'dis':''}"><div style="flex:1"><b>${esc(x.name)}</b> <span class="hint">${esc(x.org)}</span>${x.dup ? ' <span class="badge st">동명이인 있음</span>' : ''}
+          <div class="why">${x.state==='choseMe'?'💚 나를 선택함 · ':''}${esc(x.note)}</div></div>
+          ${dis ? '' : picked ? '<span class="badge">선택함</span>' : `<button class="sm pri" data-act="mate" data-id="${x.id}">선택</button>`}</div>`; }).join('') || '<p class="hint">표시할 분이 없어요</p>';
+  }
+
+  // 4단계: 같은 방 원하는 분 고르기 (상대의 스타일이 보임)
+  function candView(){
+    const v = U.view, c = v.choice, mates = c.mates, cands = v.candidates, byId = {}; cands.forEach(x => byId[x.id] = x);
+    const maxM = U.boot.maxMates;
+    let h = `<div class="card big-card"><h2>같은 방을 쓰고 싶은 분이 있나요?</h2>
+      <p class="hint">없으면 바로 <b>선택 완료</b>를 누르세요. 상대도 나를 선택해야 합방이 확정돼요. 최대 ${maxM}명, 같은 성별 분만 보여요.</p>
+      ${c.traits.length ? `<p style="margin:4px 0">내 스타일: ${badges(c.traits)}</p>` : ''}`;
+    mates.forEach(id => {
+      const x = byId[id]; if (!x) return; const ok = x.state === 'choseMe';
+      h += `<div class="banner ${ok?'ok':'wait'}"><b>${esc(x.name)}</b> ${ok ? '✔ 서로 선택 — 합방 확정' : '⏳ 상대가 아직 나를 선택하지 않았어요'}
+        <button class="sm" data-act="unmate" data-id="${id}" style="float:right">취소</button>
+        ${ok ? '' : '<div style="font-size:12px;margin-top:2px">상대에게 직접 알려 주세요. 상대가 나를 선택하면 확정돼요.</div>'}</div>`;
+    });
+    if (v.incoming.some(i => mates.indexOf(i) < 0)) h += `<div class="banner ok">나를 선택한 분이 있어요! 아래 <b>"나를 선택함"</b> 분을 선택하면 합방이 확정돼요.</div>`;
+    h += `<input type="text" id="cq" placeholder="이름 검색" value="${esc(U.cq)}" class="bigin" style="font-size:16px">`;
+    h += `<div id="candlist" style="max-height:46vh;overflow:auto;margin-top:6px">${candListHtml()}</div>
+      <div class="row2" style="margin-top:10px"><button class="bigbtn" data-act="back">← 다시 선택</button><button class="bigbtn pri" data-act="finish">선택 완료</button></div></div>`;
+    return h;
+  }
+
+  // 직접 스타일 고르기
+  function styleView(){
+    const c = U.view.choice;
+    return `<div class="card big-card"><h2>내 스타일을 알려 주세요</h2>
+      <p class="hint">해당하는 것을 모두 고르세요. 자동 배정에만 쓰이고 다른 연수생에게는 보이지 않아요.</p>
+      <div>${U.boot.traits.map(t => `<label class="chk bigchk"><input type="checkbox" data-trait="${t.id}" ${c.traits.includes(t.id)?'checked':''}>${esc(t.label)}</label>`).join('')}</div>
+      <label class="chk bigchk"><input type="checkbox" id="same" ${c.sameWish?'checked':''}>같은 스타일의 분과 같은 방을 원해요</label>
+      <input type="text" id="note" maxlength="100" placeholder="추가로 알리고 싶은 내용 (담당자에게만 보여요)" value="${esc(c.note)}" class="bigin" style="font-size:16px">
+      <div class="row2" style="margin-top:10px"><button class="bigbtn" data-act="back">← 다시 선택</button><button class="bigbtn pri" data-act="saveStyle">저장하고 선택 완료</button></div></div>`;
+  }
+
+  // 5단계: 접수 완료
+  function doneView(locked){
+    const v = U.view, c = v.choice, byId = {}; v.candidates.forEach(x => byId[x.id] = x);
+    const stay = c.status !== 'commute';
+    let extra = '';
+    if (stay){
+      extra = (c.traits.length ? `<div style="margin:4px 0">내 스타일: ${badges(c.traits)}${c.sameWish ? ' <span class="hint">· 같은 스타일 희망</span>' : ''}</div>` : '')
+        + c.mates.map(id => { const x = byId[id]; return x ? `<div>• ${esc(x.name)} ${x.state==='choseMe' ? '<b style="color:var(--ok)">✔ 합방 확정</b>' : '⏳ 상대 수락 대기'}</div>` : ''; }).join('');
+    }
+    const inc = v.incoming.filter(i => c.mates.indexOf(i) < 0);
+    const title = c.status === 'commute' ? '출근' : '숙박';
+    return `<div class="card big-card"><div class="okmark">✔</div><h2>${esc(v.me.name)}님, 접수됐어요</h2>
+      <p style="font-size:18px;margin:4px 0"><b>${title}</b></p>${extra}
+      ${inc.length ? '<div class="banner ok" style="margin-top:8px">나를 같은 방으로 선택한 분이 있어요. 수락하려면 [같은 방 고르기]를 눌러 주세요.</div>' : ''}
+      <p class="hint" style="margin-top:10px">방 배정이 확정되면 같은 주소에서 같은 번호로 들어와 내 방을 확인할 수 있어요.</p>
+      ${locked ? '' : `<div class="row2"><button class="bigbtn" data-act="edit">선택 바꾸기</button>${stay && (!c.traits.length || inc.length) ? '<button class="bigbtn" data-act="remate">같은 방 고르기</button>' : ''}</div>`}
+      <button class="sm link" id="switch">다른 번호로 들어가기</button></div>`;
+  }
+
+  function roomCard(v){
+    let h = `<div class="card big-card"><div class="hint">${esc(v.me.name)}님의 숙소</div>`;
+    if (v.room){
+      h += `<div class="roomcard">${v.room.floor}층 ${esc(v.room.id)}호${v.room.type==='ondol'?' <span class="badge">온돌방</span>':''}</div>
+        <p style="margin:8px 0 0">같은 방: ${v.room.mates.length ? v.room.mates.map(m => `<b>${esc(m.name)}</b>${m.org?` <span class="hint">${esc(m.org)}</span>`:''}`).join(', ') : '혼자 사용'}</p></div>
+        <div class="card"><h2>${v.room.floor}층 배치도 <span class="hint">(★ 파란 테두리가 내 방)</span></h2>${planHtml(v.room.floor, { rooms: v.rooms }, r => `<div class="room ${r.id===v.room.id?'mine':'dim'} ${r.type==='ondol'?'ondol':''}"><span class="roomno">${r.id}<span class="ho">호</span></span>${r.id===v.room.id?'<div class="me">★<span class="metxt"> 내 방</span></div>':''}</div>`)}`;
+    } else {
+      h += `<div class="banner wait" style="margin:8px 0 0">${status()==='commute' ? '출근을 선택하셨어요. 배정된 숙소가 없습니다.' : '배정된 방이 없습니다. 연수 담당자에게 문의해 주세요.'}</div>`;
+    }
+    return h + `</div><div class="card"><button class="sm link" id="switch">다른 번호로 들어가기</button></div>`;
+  }
+
+  function bind(){
+    const ph = $('#phone');
+    if (ph){ ph.oninput = () => { U.phone = fmtPhone(ph.value); }; ph.onkeydown = e => { if (e.key === 'Enter') $('#go').click(); }; }
+    const go = $('#go'); if (go) go.onclick = async () => {
+      if (!phoneOk()){ toast('휴대전화 번호를 010-0000-0000 형식으로 입력해 주세요', true); return; }
+      try { await login(); } catch(e){ toast(e.message, true); }
+    };
+    const sw = $('#switch'); if (sw) sw.onclick = logout;
+    const cq = $('#cq'); if (cq) cq.oninput = () => { U.cq = cq.value; const L = $('#candlist'); if (L) L.innerHTML = candListHtml(); };
+  }
+
+  async function submit(patch){
+    const ch = Object.assign({}, U.view.choice, patch);
+    try { U.view = await call('pub_submit', EV, U.view.me.id, U.phone, ch); }
+    catch(e){ toast(e.message, true); }
+    render();
+  }
+  async function choose(k){
+    if (!U.view) return;
+    const o = opts().find(x => x.id === k); if (!o) return;
+    const keep = U.view.choice;
+    U.edit = false; U.filter = ''; U.cq = '';
+    if (o.kind === 'commute'){ U.step = null; return submit({ status:'commute', mates:[], traits:[], sameWish:false, note:'' }); }
+    if (o.kind === 'stay'){ U.step = null; return submit({ status:'stay', mates:keep.mates, traits:[], sameWish:false, note:'' }); }
+    if (o.kind === 'pick'){ U.step = 'cand'; return submit({ status:'stay', mates:keep.mates, traits:[], sameWish:false, note:'' }); }
+    U.step = null; // 유형 선택은 사람을 고르지 않고 바로 완료 (자동 배정이 같은 유형끼리 매칭)
+    return submit({ status:'stay', mates:[], traits:o.traits, sameWish:true, note:'' });
+  }
+  async function addMate(id){
+    const v = U.view, c = v.candidates.find(x => x.id === id), mates = v.choice.mates;
+    if (!c || mates.includes(id)) return;
+    if (c.dup && !confirm('⚠ 이름과 소속이 같은 분(동명이인)이 있어요.'+'\n'+'\n'+'같은 방을 쓰기로 한 분이 맞는지 시스템은 알 수 없어요. 선택해 두면, 그 분이 나를 선택했을 때 합방이 확정돼요.'+'\n'+'\n'+'같이 쓸 분께 "나를 선택해 달라"고 꼭 알려 주세요. 다른 분이 응하지 않으면 확정되지 않으니, 그때 다시 바꾸시면 돼요.'+'\n'+'\n'+'그래도 ' + c.name + '(' + (c.org || '소속 없음') + ')님을 선택할까요?')) return;
+    if (mates.length >= U.boot.maxMates){ toast('같은 방 희망은 최대 ' + U.boot.maxMates + '명까지예요', true); return; }
+    await submit({ mates: mates.concat(id) });
+  }
+  async function drop(id, target){ if (U.view && U.view.me.id === id && opts().some(o => o.id === target)) await choose(target); }
+
+  document.addEventListener('click', async e => {
+    if (mode !== 'user') return;
+    const b = e.target.closest('[data-act]'); if (!b) return;
+    const a = b.dataset.act;
+    if (a === 'zone') await choose(b.dataset.z);
+    else if (a === 'gender'){ try { await call('pub_setGender', EV, U.view.me.id, U.phone, b.dataset.g); U.view = await call('pub_me', EV, U.view.me.id, U.phone); render(); } catch(er){ toast(er.message, true); } }
+    else if (a === 'mate') await addMate(b.dataset.id);
+    else if (a === 'unmate') await submit({ mates: U.view.choice.mates.filter(x => x !== b.dataset.id) });
+    else if (a === 'filter'){ U.filter = b.dataset.t; render(); }
+    else if (a === 'finish'){ U.step = null; render(); }
+    else if (a === 'back' || a === 'edit'){ U.edit = true; U.step = null; render(); }
+    else if (a === 'cancelEdit'){ U.edit = false; render(); }
+    else if (a === 'remate'){ U.step = 'cand'; U.edit = false; render(); }
+    else if (a === 'saveStyle'){
+      const traits = [...document.querySelectorAll('[data-trait]:checked')].map(x => x.dataset.trait);
+      U.step = null; await submit({ traits, sameWish: $('#same').checked, note: $('#note').value });
+    }
+  });
+  return { init, render, drop };
+})();
+
+// ═════════ 관리자 화면 ═════════
+const Admin = (() => {
+  const A = { dirtyCfg: false, pp: {}, pw: '', ev: '', events: null, authed: false, st: null, tab: 'people', hasPw: null, onlyBlank: false, q: '', sel: {} };
+  const TABS = [['people','① 명단'],['rooms','② 객실·옵션'],['status','③ 신청 현황'],['assign','④ 배정']];
+  const STATUS = { none:'미응답', commute:'출근', mate:'같은 방 요청', stay:'숙박', style:'숙박(유형)' };
+  const SHORT = { snore:'코', sensitive:'예', late:'늦', early:'일', quiet:'조' };
+  let saveT;
+
+  async function render(){
+    if (mode !== 'admin') return;
+    const app = $('#app');
+    if (!A.authed){
+      if (A.hasPw === null){
+        try { A.hasPw = (await call('adm_status')).hasPw; } catch(e){ app.innerHTML = '<div class="card">' + esc(e.message) + '</div>'; return; }
+        const saved = ls.get('ra_adm'); if (saved && A.hasPw){ try { A.events = await call('adm_events', saved); A.pw = saved; A.authed = true; } catch(e){ ls.del('ra_adm'); } }
+      }
+      if (!A.authed){
+        app.innerHTML = `<div class="card" style="max-width:420px"><h2>${A.hasPw ? '관리자 로그인' : '처음 설정: 관리자 비밀번호 정하기'}</h2>
+          <div class="row"><input type="password" id="pw" placeholder="비밀번호" style="flex:1"><button class="pri" id="login">${A.hasPw ? '들어가기' : '정하기'}</button></div>
+          ${A.hasPw ? '' : '<p class="hint">4자 이상. 이 비밀번호를 아는 사람만 관리자 화면을 쓸 수 있어요.</p>'}</div>`;
+        const go = async () => {
+          const pw = $('#pw').value;
+          try { if (!A.hasPw) await call('adm_init', pw); A.events = await call('adm_events', pw); A.pw = pw; A.hasPw = true; A.authed = true; ls.set('ra_adm', pw); render(); }
+          catch(e){ toast(e.message, true); }
+        };
+        $('#login').onclick = go; $('#pw').onkeydown = e => { if (e.key === 'Enter') go(); };
+        return;
+      }
+    }
+    if (!A.ev){ setCourse(''); app.innerHTML = vEvents(); return; }
+    if (!A.st){ try { A.st = await call('adm_state', A.pw, A.ev); } catch(e){ toast(e.message, true); A.ev = ''; render(); return; } }
+    const t = A.tab, evName = A.st.event.name, link = pubLink(A.ev);
+    let h = `<div class="card noprint"><div class="row"><button id="toEvents">← 연수 목록</button><label class="hint">연수 이름</label><input type="text" id="evName" value="${esc(evName)}" maxlength="60" style="font-size:16px;font-weight:700;min-width:220px;flex:1"><button class="sm" data-act="renameCur">이름 변경</button>${A.st.published ? '<span class="badge" style="background:var(--ok-bg);color:var(--ok)">공개 중</span>' : ''}</div>
+      <div class="row" style="margin-top:6px"><span class="hint">연수생 주소</span><input type="text" readonly value="${esc(link)}" style="flex:1;min-width:220px" onclick="this.select()"><button class="sm" data-act="copyLink" data-link="${esc(link)}">복사</button></div></div>
+      <div class="tabs noprint" style="margin-bottom:10px">${TABS.map(([k,l]) => `<button class="tab ${t===k?'on':''}" data-tab="${k}">${l}</button>`).join('')}
+      <button class="tab" id="logout" style="margin-left:auto">로그아웃</button></div>`;
+    h += (t === 'people' || t === 'rooms') ? saveBarHtml() : '';
+    h += t === 'people' ? vPeople() : t === 'rooms' ? vRooms() : t === 'status' ? vStatus() : vAssign();
+    app.innerHTML = h;
+    setCourse(evName);
+  }
+
+  // ── 연수 목록 ──
+  function vEvents(){
+    const evs = A.events || [], act = evs.filter(e => !e.archived), arc = evs.filter(e => e.archived);
+    const row = e => { const link = pubLink(e.id); return `<tr data-eid="${e.id}">
+      <td><b>${esc(e.name)}</b>${e.published ? ' <span class="badge" style="background:var(--ok-bg);color:var(--ok)">공개 중</span>' : ''}${e.archived ? ' <span class="badge">보관됨</span>' : ''}</td>
+      <td>${e.people}명</td>
+      <td style="min-width:220px"><input type="text" readonly value="${esc(link)}" style="width:100%;font-size:12px" onclick="this.select()"></td>
+      <td style="white-space:nowrap"><button class="sm pri" data-act="openEv">열기</button> <button class="sm" data-act="copyLink" data-link="${esc(link)}">주소 복사</button>
+        <button class="sm" data-act="renameEv">이름 변경</button> <button class="sm" data-act="archiveEv" data-v="${e.archived ? 0 : 1}">${e.archived ? '보관 해제' : '보관'}</button></td></tr>`; };
+    return `<div class="card"><h2>새 연수 만들기</h2>
+        <p class="hint">연수마다 명단·전화번호·방 설정·배정이 따로 관리되고, 연수생용 주소도 따로 만들어져요.</p>
+        <div class="row"><input type="text" id="newName" placeholder="연수 이름 (예: 6급 승진자과정 4기)" style="flex:1;min-width:200px">
+        <select id="copyFrom"><option value="">방 설정: 기본값으로 시작</option>${evs.map(e => `<option value="${e.id}">방 설정: ${esc(e.name)}에서 복사</option>`).join('')}</select>
+        <button class="pri" data-act="createEv">만들기</button></div></div>
+      <div class="card"><h2>진행 중인 연수 (${act.length})</h2>
+        <div class="scroll" style="max-height:none"><table><thead><tr><th>연수</th><th>인원</th><th>연수생 주소</th><th></th></tr></thead><tbody>${act.map(row).join('') || '<tr><td colspan="4" class="hint">없음</td></tr>'}</tbody></table></div></div>
+      ${arc.length ? `<div class="card"><h2>보관된 연수 (${arc.length})</h2><div class="scroll" style="max-height:none"><table><tbody>${arc.map(row).join('')}</tbody></table></div><p class="hint">보관하면 연수생이 그 주소로 들어갈 수 없어요. 데이터는 남아 있어요.</p></div>` : ''}
+      <div class="card noprint"><button id="logout">로그아웃</button></div>`;
+  }
+
+  const P = () => A.st.people;
+  const pById = () => { const m = {}; P().forEach(p => m[p.id] = p); return m; };
+
+  // ── 명단 ──
+  function peopleRowsHtml(){
+    const ps = P(), q = A.q.trim();
+    const list = ps.map((p,i) => [p,i]).filter(([p]) => (!A.onlyBlank || !p.gender) && (!q || p.name.includes(q) || p.org.includes(q)));
+    return list.map(([p,i]) => `<tr data-pid="${p.id}"><td>${i+1}</td>
+        <td><input type="text" data-f="name" value="${esc(p.name)}"></td>
+        <td><button class="gbtn ${p.gender||'N'}" data-act="gender">${GN[p.gender]}</button></td>
+        <td><input type="text" data-f="org" value="${esc(p.org)}"></td>
+        <td><input type="text" data-f="rank" value="${esc(p.rank)}"></td>
+        <td style="white-space:nowrap">${p.role ? '<span class="hint">-</span>' : p.claimed?`✔ ***${esc(p.last4)} <button class="sm" data-act="resetPhone" title="등록된 번호 지우기">지우기</button>`:`<input type="text" data-f="phone" inputmode="numeric" placeholder="010-0000-0000" value="${esc(p.phonePending || '')}" style="width:130px">`}</td>
+        <td><select data-f="role">${['', '강사', '보조강사', '운영자'].concat(p.role && !['강사','보조강사','운영자'].includes(p.role) ? [p.role] : []).map(r => `<option value="${esc(r)}" ${p.role===r?'selected':''}>${r || '연수생'}</option>`).join('')}</select></td>
+        <td><button class="sm bad" data-act="del">삭제</button></td></tr>`).join('');
+  }
+
+  function vPeople(){
+    const all = P(), ps = all.filter(p => !p.role), staff = all.filter(p => p.role), cnt = g => ps.filter(p => p.gender === g).length;
+    const q = A.q.trim();
+    const list = ps.map((p,i) => [p,i]).filter(([p]) => (!A.onlyBlank || !p.gender) && (!q || p.name.includes(q) || p.org.includes(q)));
+    return `<div class="card"><h2>명단 현황</h2>
+      연수생 <b>${ps.length}</b>명${staff.length ? ` (강사·운영자 ${staff.length}명 별도)` : ''} · 남 ${cnt('M')} · 여 ${cnt('F')} · <span style="color:var(--warn)">성별 미입력 ${cnt('')}</span> · 전화번호 등록 ${ps.filter(p=>p.claimed).length}${ps.some(p=>!p.claimed)?` <span style="color:var(--bad)">· 미등록 ${ps.filter(p=>!p.claimed).length}명은 접속할 수 없어요</span>`:''}
+    </div>
+    <div class="card noprint"><h2>명단 올리기</h2>
+      <div class="row" style="margin-bottom:8px"><button id="tpl">엑셀 서식 내려받기</button>
+        <label class="chk"><input type="file" id="xfile" accept=".xlsx,.xls,.csv" style="display:none"><button id="xbtn">엑셀 파일 올리기</button></label>
+        <span class="hint">서식 열: <b>성명 · 성별 · 소속 · 직급 · 전화번호</b> (성별·전화번호는 비워도 됩니다)</span></div>
+      <p class="hint">엑셀·한글 표에서 복사해 붙여넣어도 돼요. 첫 줄에 <b>성명, 성별, 소속, 직급, 전화번호</b> 머리글이 있으면 열 순서가 달라도 되고, 없으면 그 순서로 읽어요. 성별을 비워 두면 연수생이 직접 입력하거나 아래에서 입력할 수 있어요. <b>전화번호는 필수예요</b> — 연수생은 등록된 번호로만 들어올 수 있어요. 암호화되어 저장되고 끝 4자리만 보여요.</p>
+      <textarea id="imp" placeholder="성명&#9;성별&#9;소속&#9;직급&#9;전화번호"></textarea>
+      <div class="row" style="margin-top:6px">
+        <label class="chk"><input type="radio" name="impm" value="append" checked>기존 명단에 추가(중복은 성별·번호만 보완)</label>
+        <label class="chk"><input type="radio" name="impm" value="replace">명단 새로 구성(같은 사람의 선택·번호는 유지, 빠진 사람은 삭제)</label>
+        <button class="pri" id="doImp">올리기</button>
+        <button id="addOne">한 명 추가</button></div></div>
+    <div class="card noprint"><h2>강사·보조강사·운영자 추가</h2>
+      <p class="hint">전화번호나 선택 없이 이름·성별만 넣어요. 자동 배정에서는 빠지고, <b>④ 배정 탭에서 빈방에 직접 끌어다 놓아요.</b> (이 칸에 넣은 분은 연수생 같은 방 후보에 나오지 않아요)</p>
+      <div class="row"><input type="text" id="stName" placeholder="성명" style="width:140px">
+        <select id="stGender"><option value="M">남</option><option value="F">여</option></select>
+        <select id="stRole"><option>강사</option><option>보조강사</option><option>운영자</option></select>
+        <button class="pri" data-act="addStaff">추가</button></div></div>
+    <div class="card noprint"><h2>성별 한꺼번에 입력</h2>
+      <p class="hint">성별 열만 복사해(남/여, 한 줄에 한 명) 붙여넣으면 <b>아래 표의 현재 순서대로</b> 적용해요. 이미 입력된 성별은 덮어씁니다.</p>
+      <div class="row"><textarea id="gen" style="min-height:60px;flex:1" placeholder="남&#10;여&#10;남"></textarea><button id="doGen">적용</button></div></div>
+    <div class="card"><div class="row noprint" style="margin-bottom:6px">
+      <input type="text" id="aq" placeholder="이름·소속 검색" value="${esc(A.q)}"><label class="chk"><input type="checkbox" id="blank" ${A.onlyBlank?'checked':''}>성별 미입력만</label>
+      <span class="hint">성별 버튼: 남 → 여 → 미입력. 칸을 바꾸면 바로 저장돼요. 전화번호가 있어야 연수생이 접속해요.</span></div>
+      <div class="scroll"><table><thead><tr><th>#</th><th>성명</th><th>성별</th><th>소속</th><th>직급</th><th>전화번호</th><th>구분</th><th></th></tr></thead><tbody id="peopleRows">${peopleRowsHtml()}</tbody></table></div></div>`;
+  }
+
+  function parseRows(text){
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (!lines.length) return [];
+    const split = l => (l.includes('\t') ? l.split('\t') : l.split(',')).map(x => x.trim().replace(/^"|"$/g,''));
+    let first = split(lines[0]), cols = { name:0, gender:1, org:2, rank:3, phone:4 }, body = lines;
+    const hasHead = first.some(x => /^(성명|이름)$/.test(x));
+    if (hasHead){
+      cols = {}; first.forEach((x,i) => { if (/^(성명|이름)$/.test(x)) cols.name = i; else if (/^성별$/.test(x)) cols.gender = i; else if (/^(소속|기관|학교)$/.test(x)) cols.org = i; else if (/^(직급|직위)$/.test(x)) cols.rank = i; else if (/^(전화번호|전화|연락처|휴대전화|휴대폰)$/.test(x)) cols.phone = i; });
+      body = lines.slice(1);
+    }
+    const g = s => /^(남|남자|남성|M)$/i.test(s||'') ? 'M' : /^(여|여자|여성|F)$/i.test(s||'') ? 'F' : '';
+    return body.map(split).map(c => ({ name: c[cols.name] || '', gender: cols.gender !== undefined ? g(c[cols.gender]) : '', org: cols.org !== undefined ? (c[cols.org]||'') : '', rank: cols.rank !== undefined ? (c[cols.rank]||'') : '', phone: cols.phone !== undefined ? (c[cols.phone]||'') : '' })).filter(r => r.name);
+  }
+
+  // ── 객실·옵션 ──
+  function vRooms(){
+    const c = A.st.config;
+    const floors = [...new Set(c.rooms.map(r => r.floor))].sort((a,b) => b-a);
+    const gsel = f => `<select data-fg="${f}">${[['M','남자 층'],['F','여자 층'],['','남녀 혼용']].map(([v,l]) => `<option value="${v}" ${(c.floorGender[f]||'')===v?'selected':''}>${l}</option>`).join('')}</select>`;
+    return `<div class="card"><h2>기본 옵션</h2>
+      <div class="row" style="margin-bottom:8px"><label>신청 마감 <input type="datetime-local" id="dl" value="${esc(c.deadline || '')}"></label>
+        <button class="sm" data-act="dlClear">마감 없음</button>
+        <span class="hint">마감 시각(한국시간) 이후에는 연수생이 선택·성별을 바꿀 수 없어요. 관리자는 마감 후에도 자유롭게 배정할 수 있어요.</span></div>
+      <div class="row">
+        <label>방당 인원 <select id="per">${[1,2,3,4,5,6].map(n => `<option ${c.perRoom===n?'selected':''}>${n}</option>`).join('')}</select>명</label>
+        <label>온돌방 정원 <select id="ond">${[1,2,3,4,5,6,8].map(n => `<option ${c.ondolCap===n?'selected':''}>${n}</option>`).join('')}</select>명</label>
+        
+        <span class="hint" style="flex-basis:100%">배정 원칙: 방 정원을 넘기지 않고, 모두 이 인원으로 채우되 나누어떨어지지 않는 인원만 작은 방으로 묶어요(정원 2: 남는 1명은 독실 / 정원 3: 남는 2명은 2인실 하나, 남는 1명은 2인실 둘). 그 안에서 생활 유형이 맞는 분끼리 최대한 같은 방이 돼요.</span>
+        <label class="chk"><input type="checkbox" id="cross" ${c.allowCross?'checked':''}>자리가 모자라면 다른 성별 층의 빈 방도 사용</label></div>
+      <div class="row" style="margin-top:6px">미응답자:
+        <label class="chk"><input type="radio" name="und" value="exclude" ${c.undecided!=='stay'?'checked':''}>배정에서 제외</label>
+        <label class="chk"><input type="radio" name="und" value="stay" ${c.undecided==='stay'?'checked':''}>숙박으로 보고 배정</label></div></div>
+    ${vOptions()}
+    <div class="card"><h2>층별 설정</h2><p class="hint">'채움 순서'가 작은 층부터 방을 채워요(같은 성별 층끼리 비교). 예: 남자 1·3층 → 1층 먼저.</p>
+      <table><thead><tr><th>층</th><th>성별</th><th>채움 순서</th><th>사용 방 / 전체</th></tr></thead><tbody>
+      ${floors.map(f => { const rs = c.rooms.filter(r => r.floor === f); return `<tr><td><b>${f}층</b></td><td>${gsel(f)}</td>
+        <td><input type="number" min="1" max="9" style="width:60px" data-fo="${f}" value="${c.floorOrder.indexOf(f)+1}"></td><td>${rs.filter(r=>r.use).length} / ${rs.length}</td></tr>`; }).join('')}</tbody></table></div>
+    <div class="card"><h2>방별 사용 · 정원</h2>
+      <div class="row" style="margin-bottom:6px"><button class="sm" data-act="ondolAll" data-v="1">온돌방 모두 사용</button><button class="sm" data-act="ondolAll" data-v="0">온돌방 모두 사용 안 함</button>
+      <span class="hint">배치도의 호수 칸을 체크하면 사용, 해제하면 빗금(사용 안 함)이에요. 정원 칸을 비우면 기본(방당 인원/온돌 정원)을 따라요.</span></div>
+      ${floors.map(f => `<div class="floor"><h3>${f}층</h3>${planHtml(f, c, r => `<div class="room ${r.use?'':'off'} ${r.type==='ondol'?'ondol':''}" data-rid="${r.id}">
+        <label class="chk" style="margin:0"><input type="checkbox" data-ru ${r.use?'checked':''}><span class="roomno">${r.id}호</span></label>
+        <div class="row" style="margin-top:4px;gap:3px;font-size:11px;flex-wrap:nowrap">정원<input type="number" min="1" max="8" style="width:46px;padding:2px 4px" data-rc value="${r.cap||''}" placeholder="${Assign_cap(r,c)}"></div>
+        ${r.note ? `<div class="hint" style="font-size:10px;line-height:1.2">${esc(r.note)}</div>` : ''}</div>`)}</div>`).join('')}</div>`;
+  }
+  const KINDS = [['commute','출근 (방 필요 없음)'],['stay','숙박'],['pick','숙박 + 같은 방 지정 화면'],['style','숙박 + 자동 배정 유형']];
+  const CIRC_A = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳';
+  function vOptions(){
+    const c = A.st.config, os = c.options || [];
+    return `<div class="card"><h2>연수생 선택 화면의 선택지</h2>
+      <p class="hint">연수생이 이름표를 놓는 칸의 <b>제목과 설명</b>을 바꾸고, 쓰지 않을 선택지는 끄거나 지우고, 순서를 바꿀 수 있어요. 종류에 따라 이후 동작이 달라져요 —
+      <b>출근</b>: 방 배정 제외 · <b>숙박</b>: 바로 완료 · <b>숙박 + 같은 방 지정</b>: 같은 방 쓸 분을 이름으로 고르는 화면으로 이동 · <b>숙박 + 자동 배정 유형</b>: 고른 유형(코골이 등)이 자동 배정에 반영돼요. 사람을 고르는 화면 없이 바로 완료되고, 같은 유형끼리 시스템이 매칭해요.
+      선택지에 쓴 번호(①②…)는 순서대로 자동으로 붙어요.</p>
+      ${os.map((o,i) => `<div class="optrow" data-oi="${i}">
+        <label class="chk"><input type="checkbox" data-ou ${o.use?'checked':''}>사용</label><b>${CIRC_A[i] || (i+1)+'.'}</b>
+        <input type="text" data-ot value="${esc(o.title)}" placeholder="제목" maxlength="40" style="flex:2;min-width:160px">
+        <input type="text" data-od value="${esc(o.desc)}" placeholder="설명 (선택)" maxlength="80" style="flex:3;min-width:180px">
+        <select data-ok>${KINDS.map(([v,l]) => `<option value="${v}" ${o.kind===v?'selected':''}>${l}</option>`).join('')}</select>
+        ${o.kind === 'style' ? `<span>${c.traits.map(t => `<label class="chk"><input type="checkbox" data-tid="${t.id}" ${o.traits.includes(t.id)?'checked':''}>${esc(t.short || t.label)}</label>`).join('')}</span>` : ''}
+        <button class="sm" data-act="optUp" ${i===0?'disabled':''}>↑</button><button class="sm" data-act="optDown" ${i===os.length-1?'disabled':''}>↓</button><button class="sm bad" data-act="optDel">삭제</button></div>`).join('')}
+      <div class="row" style="margin-top:8px"><button class="sm" data-act="optAdd">+ 선택지 추가</button><button class="sm" data-act="optReset">기본 선택지로 되돌리기</button></div></div>`;
+  }
+  const Assign_cap = (r, c) => r.cap || (r.type === 'ondol' ? c.ondolCap : c.perRoom);
+
+  // ── 저장 버튼 방식: 명단 표·객실/옵션 수정은 [저장]을 눌러야 서버에 반영된다 ──
+  const isDirty = () => A.dirtyCfg || Object.keys(A.pp).length > 0;
+  function saveCfg(){ A.dirtyCfg = true; updateBar(); }
+  function updateBar(){
+    const b = $('#saveBar'); if (!b) return;
+    const d = isDirty(); b.classList.toggle('dirty', d);
+    $('#dirtyMsg').textContent = d ? '저장하지 않은 변경이 있어요' : '변경 사항 없음';
+    $('#saveBtn').disabled = !d;
+  }
+  function saveBarHtml(){
+    const d = isDirty();
+    return `<div class="card savebar noprint ${d?'dirty':''}" id="saveBar"><button class="pri" id="saveBtn" ${d?'':'disabled'}>저장</button><span id="dirtyMsg" class="hint">${d ? '저장하지 않은 변경이 있어요' : '변경 사항 없음'}</span></div>`;
+  }
+  async function saveAll(){
+    try {
+      const cfgLocal = A.dirtyCfg ? A.st.config : null;
+      const ids = Object.keys(A.pp);
+      if (ids.length){ A.st = await call('adm_updatePeople', A.pw, A.ev, ids.map(id => Object.assign({ id }, A.pp[id]))); A.pp = {}; }
+      if (cfgLocal){ A.st.config = cfgLocal; A.st = await call('adm_saveConfig', A.pw, A.ev, A.st.config); A.dirtyCfg = false; }
+      toast('저장했어요'); render();
+    } catch(e){ toast(e.message, true); }
+  }
+  async function guardSave(){
+    if (!isDirty()) return true;
+    if (confirm('저장하지 않은 변경이 있어요. 저장하고 이동할까요?\n(취소를 누르면 그대로 머물러요)')){ await saveAll(); return !isDirty(); }
+    return false;
+  }
+
+  // ── 신청 현황 ──
+  function vStatus(){
+    const ps = P().filter(p => !p.role), ch = A.st.choices, c = k => ps.filter(p => ((ch[p.id]||{}).status || 'none') === k).length;
+    const byId = pById();
+    return `<div class="card"><h2>신청 현황</h2>총 ${ps.length}명 · 출근 ${c('commute')} · 숙박(요청 포함) ${c('mate')+c('stay')+c('style')} · <span style="color:var(--warn)">미응답 ${c('none')}</span>
+      <div class="row noprint" style="margin-top:8px"><button class="bad" id="clearCh">전체 선택·배정 초기화</button><span class="hint">연수생이 응답하지 않으면 여기서 대신 선택해 줄 수 있어요.</span></div></div>
+      <div class="card"><div class="scroll" style="max-height:70vh"><table><thead><tr><th>성명</th><th>성별</th><th>선택</th><th>같은 방 희망</th><th>유형</th><th>메모</th></tr></thead><tbody>
+      ${ps.map(p => { const k = ch[p.id] || { status:'none', mates:[], traits:[] };
+        const mates = (k.mates||[]).map(id => { const o = ch[id]||{}; const mutual = ['mate','stay','style'].includes(o.status) && (o.mates||[]).includes(p.id); return `${esc((byId[id]||{}).name||'?')}${mutual?' ✔':' ⏳'}`; }).join(', ');
+        return `<tr data-pid="${p.id}"><td>${esc(p.name)}</td><td>${GN[p.gender]}</td>
+          <td><select data-act="setStatus">${Object.entries(STATUS).map(([v,l]) => `<option value="${v}" ${k.status===v?'selected':''}>${l}</option>`).join('')}</select></td>
+          <td>${mates}</td><td>${(k.traits||[]).map(t => esc((A.st.config.traits.find(x=>x.id===t)||{}).label||t)).join(', ')}${k.sameWish?' <span class="badge">같은 유형 희망</span>':''}</td><td>${esc(k.note||'')}</td></tr>`; }).join('')}
+      </tbody></table></div><p class="hint">✔ 서로 선택(확정) · ⏳ 상대가 아직 수락하지 않음</p></div>`;
+  }
+
+  // ── 배정 ──
+  function chip(p, extra){
+    const k = A.st.choices[p.id] || {}, tr = (k.traits||[]).map(t => SHORT[t] || t[0]).join('');
+    const pin = A.st.pins[p.id] ? 'pin' : '';
+    return `<span class="tag ${p.gender} ${pin} ${p.role?'staff':''} ${extra||''}" data-drag="${p.id}" title="${esc(p.org)}${p.role?' · '+esc(p.role):''}${tr?' · '+tr:''}">${esc(p.name)}${p.role?`<small>${esc(p.role)}</small>`:tr?`<small>${tr}</small>`:''}</span>`;
+  }
+  function vAssign(){
+    const st = A.st, c = st.config, byId = pById();
+    const rooms = {}; Object.keys(st.assign).forEach(id => { (rooms[st.assign[id]] = rooms[st.assign[id]] || []).push(id); });
+    const floors = [...new Set(c.rooms.map(r => r.floor))].sort((a,b) => b-a);
+    const badRooms = {}; st.warnings.forEach(w => { if (w.room) badRooms[w.room] = 1; });
+    const assigned = Object.keys(st.assign).length, stay = st.stayers.length;
+    const unplaced = st.unplaced.map(id => byId[id]).filter(Boolean);
+    const unresp = P().filter(p => !p.role && ((st.choices[p.id]||{}).status || 'none') === 'none' && c.undecided !== 'stay');
+    const staffPool = P().filter(p => p.role && !st.assign[p.id]);
+    const staffBar = `<div class="card noprint staffbar"><b style="font-size:13px">강사·운영자 새 이름표</b> <span class="hint" style="font-size:12px">방으로 끌어다 놓기(이름을 물어봐요) · 이름표 더블클릭=이름 고치기</span><div>${['강사', '보조강사', '운영자'].map(r => ['M', 'F'].map(g => `<span class="tag ${g} staff" data-drag="new:${r}:${g}" style="margin:2px">＋ ${r}(${g === 'M' ? '남' : '여'})</span>`).join('')).join('')}
+        <span class="pool trash" data-drop="trash" style="display:inline-block;min-height:0;padding:5px 12px;margin-left:8px">🗑 끌어서 삭제</span></div></div>`;
+    return staffBar + `<div class="card noprint"><div class="banner ${st.published?'ok':'wait'}" style="margin:0 0 8px"><b>${st.published ? '✔ 지금 공개 중이에요 — 연수생이 자기 방을 볼 수 있어요' : '⚠ 아직 비공개예요 — 연수생은 방을 볼 수 없어요. 확인이 끝나면 아래 [확정 · 연수생에게 공개]를 눌러 주세요.'}</b></div><div class="row">
+        <button class="pri" id="run">자동 배정 (고정 유지)</button><button id="runAll" class="bad">처음부터 다시(고정 해제)</button><button id="resetAsg" class="bad">배정 전부 지우기</button>
+        <button id="pub" class="${st.published?'':'pri'}">${st.published ? '확정 취소(연수생 화면에서 숨김)' : '확정 · 연수생에게 공개'}</button>
+        <button id="csv">CSV 내려받기</button><button id="print">인쇄</button><button id="hwpx" class="pri">숙소배치도 한글(hwpx) 내려받기</button><button id="cardkey" title="연수생별 방 번호가 채워진 카드키 수령·반납 서식(엑셀)">카드키 수불부(엑셀) 내려받기</button></div>
+      <p class="hint" style="margin:6px 0 0">이름표를 끌어서 방을 바꾸면 📌 고정되어, 다시 자동 배정해도 유지돼요. 자동 배정을 다시 실행하면 공개가 풀려요.</p></div>
+    <div class="card"><b>배정 ${assigned}명</b> / 숙박 대상 ${stay}명 · 미응답 ${unresp.length}명(${c.undecided==='stay'?'숙박으로 처리':'제외'})
+      ${st.warnings.length ? `<ul class="warnlist">${st.warnings.map(w => `<li>${esc(w.text)}</li>`).join('')}</ul>` : '<div class="saved">점검 결과 문제 없음</div>'}</div>
+    <div class="card noprint"><h2>미배정 (${unplaced.length}명)</h2><div class="pool" data-drop="pool">${unplaced.map(p => chip(p)).join('') || '<span class="hint">없음</span>'}</div>
+      <h2 style="margin-top:12px">강사·운영자 — 이름표는 위쪽 고정 막대에서 끌어다 방에 놓으세요</h2>
+      <div class="hint">배치 대기 (${staffPool.length}명)</div>
+      <div class="pool" data-drop="pool">${staffPool.map(p => chip(p)).join('') || '<span class="hint">' + (P().some(p => p.role) ? '모두 배치했어요' : '위 이름표를 끌어서 만드세요') + '</span>'}</div>
+      ${st.unplaced.length && Object.keys(st.assign).length ? '' : ''}</div>
+    ${floors.map(f => `<div class="floor card"><h3>${f}층 <span class="badge">${({M:'남자 층',F:'여자 층','':'혼용'})[c.floorGender[f]||'']}</span></h3>${planHtml(f, c, r => {
+      const occ = (rooms[r.id]||[]).map(id => byId[id]).filter(Boolean), g = occ[0] ? occ[0].gender : '', cap = cap_(r, c);
+      return `<div class="room ${r.use?'':'off'} ${r.type==='ondol'?'ondol':''} ${g?'g'+g:''} ${badRooms[r.id]?'warn':''}" data-drop="room:${r.id}"><span class="roomno">${r.id}호</span><span class="cnt">${occ.length}/${cap}</span><div>${occ.map(p => chip(p)).join('')}</div></div>`; })}</div>`).join('')}`;
+  }
+  const cap_ = (r, c) => r.cap || (r.type === 'ondol' ? c.ondolCap : c.perRoom);
+
+  function csv(){
+    const byId = pById(), c = A.st.config, rows = [['방','층','성명','성별','소속','직급']];
+    const rid = id => A.st.assign[id];
+    P().filter(p => rid(p.id)).sort((a,b) => Number(rid(a.id)) - Number(rid(b.id)) || a.name.localeCompare(b.name,'ko'))
+      .forEach(p => rows.push([rid(p.id), (c.rooms.find(r => r.id === rid(p.id))||{}).floor || '', p.name, GN[p.gender], p.org, p.rank]));
+    const text = '﻿' + rows.map(r => r.map(x => '"' + String(x).replace(/"/g,'""') + '"').join(',')).join('\r\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type:'text/csv' })); a.download = '방배정표.csv'; a.click();
+  }
+
+  // ── 숙소배치도 한글(hwpx) ──
+  async function downloadHwpx(){
+    if (isDirty()) await saveAll();
+    const st = A.st, rooms = {};
+    P().forEach(p => {
+      const rid = st.assign[p.id]; if (!rid) return;
+      const r = rooms[rid] || (rooms[rid] = { names: [], g: '' });
+      r.names.push(p.name); if (!r.g && p.gender) r.g = p.gender;
+    });
+    if (!Object.keys(rooms).length){ toast('배정된 사람이 없어요', true); return; }
+    if (!st.published && !confirm('아직 공개(확정) 전이에요. 지금의 배정 상태로 파일을 만들까요?')) return;
+    const nT = P().filter(p => st.assign[p.id] && !p.role).length, nS = P().filter(p => st.assign[p.id] && p.role).length;
+    busy(1);
+    try {
+      const res = await fetch(TPL_URL); if (!res.ok) throw new Error('배치도 틀 파일을 불러오지 못했어요');
+      const out = await PlanDoc.build(JSZip, await res.arrayBuffer(), { title: st.event.name, subtitle: `연수생 ${nT}명, 운영자(강사) ${nS}명`, rooms });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([out.bytes], { type: 'application/hwp+zip' }));
+      a.download = ('숙소배치도_' + st.event.name + '.hwpx').replace(/[\\/:*?"<>|]/g, '_'); a.click();
+      toast(out.report.missing.length ? '파일을 만들었어요. 배치도에 없는 호실: ' + out.report.missing.join(', ') : '한글 파일을 만들었어요');
+    } catch(er){ toast(er.message, true); }
+    busy(-1);
+  }
+
+  // ── 카드키 수불부(엑셀) ──
+  // 연수생을 이름 가나다순으로 늘어놓고, 연수번호는 그 순서의 일련번호(나이스 연수번호와 다르면 엑셀에서 고치면 됨).
+  // 방 번호: 배정된 방 → 방 번호, 출근 선택·미응답(제외 설정) → "출퇴근", 숙박인데 아직 방이 없으면 빈칸. 강사·운영자는 넣지 않는다.
+  async function downloadCardKey(){
+    if (isDirty()) await saveAll();
+    const st = A.st, c = st.config;
+    const people = P().filter(p => !p.role).sort((a, b) => a.name.localeCompare(b.name, 'ko') || String(a.org).localeCompare(String(b.org), 'ko'));
+    if (!people.length){ toast('명단이 없어요', true); return; }
+    let blank = 0;
+    const rows = people.map((p, i) => {
+      const room = st.assign[p.id] ? String(st.assign[p.id]) : '', sc = (st.choices[p.id] || {}).status || 'none';
+      const commute = !room && (sc === 'commute' || (sc === 'none' && c.undecided !== 'stay'));
+      if (!room && !commute) blank++;
+      return { num: i + 1, org: p.org, name: p.name, room: commute ? '출퇴근' : room };
+    });
+    if (!st.published && !confirm('아직 공개(확정) 전이에요. 지금의 배정 상태로 수불부를 만들까요?')) return;
+    busy(1);
+    try {
+      const res = await fetch(TPL_CK_URL); if (!res.ok) throw new Error('수불부 틀 파일을 불러오지 못했어요');
+      const out = await CardKey.build(JSZip, await res.arrayBuffer(), { title: st.event.name + ' 생활관 카드키 수불부', rows });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([out.bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+      a.download = ('카드키수불부_' + st.event.name + '.xlsx').replace(/[\\/:*?"<>|]/g, '_'); a.click();
+      toast('수불부를 만들었어요 (' + out.rowsCount + '명)' + (blank ? ' · 방이 없는 숙박자 ' + blank + '명은 빈칸이에요' : '') + ' · 연수번호는 가나다순 번호예요');
+    } catch(er){ toast(er.message, true); }
+    busy(-1);
+  }
+
+  // ── 이벤트 ──
+  async function act(fn, ...args){
+    if (isDirty()) await saveAll();
+    try { const r = await call(fn, A.pw, A.ev, ...args); if (r && r.config){ A.st = r; render(); } return r; }
+    catch(e){ toast(e.message, true); render(); }
+  }
+  async function drop(id, target){
+    if (A.tab !== 'assign') return;
+    if (id.startsWith('new:')){   // 새 강사·운영자 이름표
+      const [, role, g] = id.split(':');
+      if (target !== 'pool' && !target.startsWith('room:')) return;
+      const room = target.startsWith('room:') ? target.slice(5) : '';
+      const nm = prompt(role + '(' + (g === 'M' ? '남' : '여') + ') 이름을 입력하세요. 비워 두면 "' + role + '"로 표시해요.', '');
+      if (nm === null) return;
+      await act('adm_addStaff', [{ name: nm.trim() || role, gender: g, role, room }]);
+      return;
+    }
+    if (target === 'trash'){
+      const p = P().find(x => x.id === id);
+      if (!p || !p.role){ toast('강사·운영자 이름표만 지울 수 있어요', true); return; }
+      if (confirm(p.name + '(' + p.role + ') 님을 지울까요?')) await act('adm_deletePeople', [id]);
+      return;
+    }
+    if (target === 'pool') return act('adm_move', id, '');
+    if (target.startsWith('room:')) {
+      const rid = target.slice(5), r = A.st.config.rooms.find(x => x.id === rid);
+      const n = Object.keys(A.st.assign).filter(k => A.st.assign[k] === rid && k !== id).length;
+      if (r && n >= cap_(r, A.st.config) && !confirm(rid + '호 정원을 넘습니다. 그래도 옮길까요?')) return;
+      return act('adm_move', id, rid);
+    }
+  }
+
+  document.addEventListener('click', async e => {
+    if (mode !== 'admin') return;
+    const t = e.target;
+    if ((t.id === 'logout' || t.id === 'toEvents' || t.dataset.tab) && !(await guardSave())) return;
+    if (t.id === 'logout'){ ls.del('ra_adm'); A.st = null; A.pw = ''; A.ev = ''; A.authed = false; A.events = null; render(); return; }
+    if (t.id === 'saveBtn'){ await saveAll(); return; }
+    if (t.id === 'toEvents'){ A.ev = ''; A.st = null; A.tab = 'people'; try { A.events = await call('adm_events', A.pw); } catch(er){ toast(er.message, true); } render(); return; }
+    const eRow = t.closest('[data-eid]'), eid = eRow && eRow.dataset.eid;
+    if (t.dataset.act === 'copyLink'){ try { await navigator.clipboard.writeText(t.dataset.link); toast('주소를 복사했어요'); } catch(er){ prompt('아래 주소를 복사하세요', t.dataset.link); } return; }
+    if (t.dataset.act === 'openEv'){ A.ev = eid; A.st = null; A.tab = 'people'; A.pp = {}; A.dirtyCfg = false; render(); return; }
+    if (t.dataset.act === 'createEv'){
+      const name = $('#newName').value.trim(); if (!name){ toast('연수 이름을 입력해 주세요', true); return; }
+      try { const r = await call('adm_createEvent', A.pw, name, $('#copyFrom').value); A.events = r.events; toast('연수를 만들었어요'); render(); } catch(er){ toast(er.message, true); }
+      return; }
+    if (t.dataset.act === 'renameCur'){
+      const n = ($('#evName').value || '').trim(); if (!n){ toast('연수 이름을 입력해 주세요', true); return; }
+      try { A.events = await call('adm_renameEvent', A.pw, A.ev, n); A.st.event.name = n; setCourse(n); toast('연수 이름을 바꿨어요'); } catch(er){ toast(er.message, true); }
+      return; }
+    if (t.dataset.act === 'renameEv'){ const cur = (A.events.find(x => x.id === eid) || {}).name, n = prompt('연수 이름', cur); if (n && n.trim()){ try { A.events = await call('adm_renameEvent', A.pw, eid, n); render(); } catch(er){ toast(er.message, true); } } return; }
+    if (t.dataset.act === 'archiveEv'){ try { A.events = await call('adm_archiveEvent', A.pw, eid, t.dataset.v === '1'); render(); } catch(er){ toast(er.message, true); } return; }
+    if (t.dataset.tab){ A.tab = t.dataset.tab; render(); return; }
+    if (!A.st) return;
+    const row = t.closest('[data-pid]'), pid = row && row.dataset.pid;
+    switch (t.dataset.act || t.id){
+      case 'dlClear': { A.st.config.deadline = ''; render(); saveCfg(); break; }
+      case 'addStaff': {
+        const name = ($('#stName').value || '').trim(); if (!name){ toast('성명을 입력해 주세요', true); return; }
+        await act('adm_addStaff', [{ name, gender: $('#stGender').value, role: $('#stRole').value }]); toast(name + ' 님을 추가했어요'); break; }
+      case 'hwpx': await downloadHwpx(); break;
+      case 'cardkey': await downloadCardKey(); break;
+      case 'optAdd': { A.st.config.options.push({ id: 'o' + Date.now().toString(36), title: '새 선택지', desc: '', kind: 'stay', traits: [], use: true }); render(); saveCfg(); break; }
+      case 'optUp': case 'optDown': {
+        const i = Number(t.closest('[data-oi]').dataset.oi), os = A.st.config.options, j = (t.dataset.act === 'optUp') ? i - 1 : i + 1;
+        if (j >= 0 && j < os.length){ [os[i], os[j]] = [os[j], os[i]]; render(); saveCfg(); } break; }
+      case 'optDel': { const i = Number(t.closest('[data-oi]').dataset.oi), os = A.st.config.options; if (os.length > 1 && confirm('이 선택지를 지울까요?')){ os.splice(i, 1); render(); saveCfg(); } break; }
+      case 'optReset': { if (confirm('선택지를 기본값으로 되돌릴까요? (직접 수정한 내용이 사라져요)')){ A.st.config.options = JSON.parse(JSON.stringify(DEFAULT_OPTIONS)); render(); saveCfg(); } break; }
+      case 'tpl': {
+        const ws = XLSX.utils.aoa_to_sheet([['성명','성별','소속','직급','전화번호'],['홍길동','남','○○교육지원청','지방교육행정주사','010-0000-0000'],['김하나','여','','','']]);
+        ws['!cols'] = [{wch:12},{wch:6},{wch:26},{wch:18},{wch:16}];
+        const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, '명단'); XLSX.writeFile(wb, '방배정_명단서식.xlsx'); break; }
+      case 'xbtn': $('#xfile').click(); break;
+      case 'doImp': {
+        const rows = parseRows($('#imp').value); if (!rows.length){ toast('올릴 내용이 없어요', true); return; }
+        const m = document.querySelector('[name=impm]:checked').value;
+        if (m === 'replace' && !confirm('명단에 없는 사람은 삭제됩니다. 계속할까요?')) return;
+        const r = await act('adm_importPeople', rows, m); toast(rows.length + '명 반영' + (r && r.badPhones && r.badPhones.length ? ' · 전화번호 형식 오류 ' + r.badPhones.length + '건(건너뜀)' : '')); break; }
+      case 'addOne': { const n = prompt('성명'); if (n) await act('adm_importPeople', [{ name:n }], 'append'); break; }
+      case 'doGen': {
+        const gs = $('#gen').value.split(/\r?\n/).map(s => s.trim()).filter(s => s !== '').map(s => /^(남|M)/i.test(s) ? 'M' : /^(여|F)/i.test(s) ? 'F' : '');
+        const ids = [...document.querySelectorAll('[data-pid]')].map(r => r.dataset.pid);
+        if (!gs.length){ toast('붙여넣은 내용이 없어요', true); return; }
+        if (gs.length !== ids.length && !confirm(`성별 ${gs.length}개, 표시된 명단 ${ids.length}명으로 개수가 달라요. 앞에서부터 적용할까요?`)) return;
+        await act('adm_setGenders', ids, gs); toast('적용됨'); break; }
+      case 'gender': { const p = P().find(x => x.id === pid), nx = p.gender === 'M' ? 'F' : p.gender === 'F' ? '' : 'M'; p.gender = nx; (A.pp[pid] = A.pp[pid] || {}).gender = nx; render(); break; }
+      case 'del': { const p = P().find(x => x.id === pid); if (confirm(p.name + ' 님을 명단에서 삭제할까요?')) await act('adm_deletePeople', [pid]); break; }
+      case 'resetPhone': if (confirm('전화번호 등록을 해제할까요? (본인이 다시 등록해야 해요)')) await act('adm_resetPhone', pid); break;
+      case 'ondolAll': { A.st.config.rooms.forEach(r => { if (r.type === 'ondol') r.use = t.dataset.v === '1'; }); render(); saveCfg(); break; }
+      case 'clearCh': if (confirm('모든 연수생의 선택과 배정을 지웁니다. 계속할까요?')) await act('adm_clearChoices'); break;
+      case 'run': { if (A.st.published && !confirm('지금 공개 중이에요. 자동 배정을 다시 실행하면 공개가 풀려요. 계속할까요?')) return; const r = await act('adm_run', true); if (r) toast('배정했어요'); break; }
+      case 'resetAsg': { if (confirm('모든 방 배정과 📌 고정을 지우고 공개도 끕니다. (연수생이 한 선택은 그대로 남아요) 계속할까요?')) await act('adm_resetAssign'); break; }
+      case 'runAll': if (confirm((A.st.published ? '지금 공개 중이에요. 다시 배정하면 공개가 풀려요. ' : '') + '고정한 배정도 모두 풀고 처음부터 다시 배정합니다.')) await act('adm_run', false); break;
+      case 'pub': {
+        if (!A.st.published && A.st.warnings.length && !confirm('점검 경고가 ' + A.st.warnings.length + '건 있어요. 그래도 공개할까요?')) return;
+        if (!A.st.published && A.st.unplaced.length && !confirm('미배정 인원이 ' + A.st.unplaced.length + '명 있어요. 그래도 공개할까요?')) return;
+        await act('adm_publish', !A.st.published); break; }
+      case 'csv': csv(); break;
+      case 'print': window.print(); break;
+    }
+    // 고정 해제: 칩의 📌 영역 클릭 대신 더블클릭 사용
+  });
+  document.addEventListener('dblclick', e => {
+    if (mode !== 'admin' || A.tab !== 'assign') return;
+    const sc = e.target.closest('.tag.staff[data-drag]');
+    if (sc && !sc.dataset.drag.startsWith('new:')){
+      const p = P().find(x => x.id === sc.dataset.drag); if (!p) return;
+      const nm = prompt('이름을 고치세요', p.name);
+      if (nm && nm.trim()) act('adm_updatePeople', [{ id: p.id, name: nm.trim() }]).then(() => toast('이름을 바꿨어요'));
+      return;
+    }
+    const c = e.target.closest('.tag.pin'); if (c) act('adm_unpin', c.dataset.drag).then(() => toast('고정 해제'));
+  });
+
+  document.addEventListener('change', async e => {
+    if (mode !== 'admin' || !A.st) return;
+    const t = e.target, row = t.closest('[data-pid]'), pid = row && row.dataset.pid, c = A.st.config;
+    if (t.closest('[data-oi]')){
+      const box = t.closest('[data-oi]'), o = c.options[Number(box.dataset.oi)];
+      if (t.hasAttribute('data-ot')) o.title = t.value;
+      else if (t.hasAttribute('data-od')) o.desc = t.value;
+      else if (t.hasAttribute('data-ok')){ o.kind = t.value; if (o.kind !== 'style') o.traits = []; render(); }
+      else if (t.hasAttribute('data-tid')) o.traits = [...box.querySelectorAll('[data-tid]:checked')].map(x => x.dataset.tid);
+      else if (t.hasAttribute('data-ou')) o.use = t.checked;
+      saveCfg(); return;
+    }
+    if (t.dataset.f && pid){
+      const p = P().find(x => x.id === pid), v = t.value.trim();
+      if (t.dataset.f === 'name' && !v){ t.value = p.name; return; }
+      if (t.dataset.f === 'phone'){ p.phonePending = v; } else p[t.dataset.f] = v;
+      (A.pp[pid] = A.pp[pid] || {})[t.dataset.f] = v; updateBar(); return;
+    }
+    if (t.dataset.act === 'setStatus'){ const old = A.st.choices[pid] || {}; await act('adm_setChoice', pid, { status: t.value, mates: old.mates, traits: old.traits, sameWish: old.sameWish, note: old.note }); return; }
+    if (t.id === 'dl') c.deadline = t.value;
+    else if (t.id === 'per') c.perRoom = Number(t.value);
+    else if (t.id === 'ond') c.ondolCap = Number(t.value);
+    else if (t.id === 'bal') c.balance = t.checked;
+    else if (t.id === 'cross') c.allowCross = t.checked;
+    else if (t.name === 'und') c.undecided = t.value;
+    else if (t.dataset.fg !== undefined) c.floorGender[t.dataset.fg] = t.value;
+    else if (t.dataset.fo){
+      const f = Number(t.dataset.fo), n = Math.max(1, Math.min(9, Number(t.value) || 1));
+      const arr = c.floorOrder.filter(x => x !== f); arr.splice(Math.min(n-1, arr.length), 0, f); c.floorOrder = arr; render();
+    }
+    else if (t.hasAttribute('data-ru') || t.hasAttribute('data-rc')){
+      const r = c.rooms.find(x => x.id === t.closest('[data-rid]').dataset.rid);
+      if (t.hasAttribute('data-ru')){ r.use = t.checked; t.closest('.room').classList.toggle('off', !r.use); } else r.cap = t.value ? Number(t.value) : null;
+    } else return;
+    saveCfg();
+  });
+  document.addEventListener('change', e => {
+    if (mode !== 'admin' || e.target.id !== 'xfile' || !e.target.files[0]) return;
+    const rd = new FileReader();
+    rd.onload = () => {
+      try {
+        const wb = XLSX.read(rd.result, { type:'array' }), ws = wb.Sheets[wb.SheetNames[0]];
+        const aoa = XLSX.utils.sheet_to_json(ws, { header:1, raw:false, defval:'' });
+        $('#imp').value = aoa.filter(r => r.some(x => String(x).trim())).map(r => r.map(x => String(x).trim()).join('\t')).join('\n');
+        toast('파일을 읽었어요. 아래 "올리기"를 눌러 반영하세요');
+      } catch(er){ toast('파일을 읽을 수 없어요: ' + er.message, true); }
+    };
+    rd.readAsArrayBuffer(e.target.files[0]); e.target.value = '';
+  });
+  document.addEventListener('input', e => {
+    if (mode !== 'admin') return;
+    if (e.target.id === 'aq'){ A.q = e.target.value; const R = $('#peopleRows'); if (R) R.innerHTML = peopleRowsHtml(); }
+  });
+  document.addEventListener('change', e => { if (mode === 'admin' && e.target.id === 'blank'){ A.onlyBlank = e.target.checked; render(); } });
+
+  return { render, drop };
+})();
+
+// ───────── 시작 ─────────
+User.init();
+if (location.hash === '#admin' || (BOOT && BOOT.admin)) setMode('admin');
+</script>
+</body>
+</html>
